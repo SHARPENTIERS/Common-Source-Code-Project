@@ -47,6 +47,7 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	cpu = new I8080(this, emu);
 	pio = new I8155(this, emu);
 	io = new IO(this, emu);
+	io->space = 0x100;
 	pcm = new PCM1BIT(this, emu);
 	rtc = new UPD1990A(this, emu);
 	
@@ -359,8 +360,8 @@ bool VM::process_state(FILEIO* state_fio, bool loading)
 		return false;
 	}
 	for(DEVICE* device = first_device; device; device = device->next_device) {
-		const char *name = typeid(*device).name() + 6; // skip "class "
-		int len = strlen(name);
+		const _TCHAR *name = char_to_tchar(typeid(*device).name() + 6); // skip "class "
+		int len = (int)_tcslen(name);
 		
 		if(!state_fio->StateCheckInt32(len)) {
 			return false;

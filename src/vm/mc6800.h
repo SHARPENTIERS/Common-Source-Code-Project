@@ -3,7 +3,7 @@
 
 	Origin : MAME 0.142
 	Author : Takeda.Toshiya
-	Date  : 2011.04.23-
+	Date   : 2011.04.23-
 
 	[ MC6800 ]
 */
@@ -65,17 +65,6 @@ private:
 	
 #if defined(HAS_MC6801) || defined(HAS_HD6301)
 	// data
-	struct {
-		uint8_t wreg;
-		uint8_t rreg;
-		uint8_t ddr;
-		uint8_t latched_data;
-		bool latched;
-		// output signals
-		outputs_t outputs;
-		bool first_write;
-	} port[4];
-	
 	uint8_t p3csr;
 	bool p3csr_is3_flag_read;
 	bool sc1_state;
@@ -103,7 +92,6 @@ private:
 	
 	// memory controller
 	uint8_t ram_ctrl;
-	uint8_t ram[128];
 	
 	uint32_t mc6801_io_r(uint32_t offset);
 	void mc6801_io_w(uint32_t offset, uint32_t data);
@@ -387,6 +375,17 @@ public:
 	~MC6800() {}
 	
 	// common functions
+	struct {
+		uint8_t wreg;
+		uint8_t rreg;
+		uint8_t ddr;
+		uint8_t latched_data;
+		bool latched;
+		outputs_t outputs;
+		bool first_write;
+	} port[4];
+	uint8_t ram[128];
+
 	void initialize();
 #if defined(HAS_MC6801) || defined(HAS_HD6301)
 	void release();

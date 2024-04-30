@@ -405,6 +405,26 @@
 					</FileConfiguration>
 				</File>
 				<File
+					RelativePath="..\src\win32\osd_midi.cpp"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+				</File>
+				<File
 					RelativePath="..\src\win32\osd_screen.cpp"
 					>
 					<FileConfiguration
@@ -510,7 +530,7 @@
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath="..\src\vm\i286.cpp"
+					RelativePath="..\src\vm\i386_dasm.cpp"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
@@ -630,6 +650,26 @@
 					</FileConfiguration>
 				</File>
 				<File
+					RelativePath="..\src\vm\i86.cpp"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+				</File>
+				<File
 					RelativePath="..\src\vm\io.cpp"
 					>
 					<FileConfiguration
@@ -671,6 +711,26 @@
 				</File>
 				<File
 					RelativePath="..\src\vm\memory.cpp"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+				</File>
+				<File
+					RelativePath="..\src\vm\midi.cpp"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
@@ -751,6 +811,26 @@
 				</File>
 				<File
 					RelativePath="..\src\vm\pcm1bit.cpp"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+				</File>
+				<File
+					RelativePath="..\src\vm\pcm8bit.cpp"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
@@ -851,6 +931,26 @@
 				</File>
 				<File
 					RelativePath="..\src\vm\upd765a.cpp"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+				</File>
+				<File
+					RelativePath="..\src\vm\v30_dasm.cpp"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
@@ -1160,6 +1260,26 @@
 					</FileConfiguration>
 				</File>
 				<File
+					RelativePath="..\src\vm\pc8801\diskio.cpp"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+				</File>
+				<File
 					RelativePath="..\src\vm\pc8801\pc88.cpp"
 					>
 					<FileConfiguration
@@ -1181,6 +1301,26 @@
 				</File>
 				<File
 					RelativePath="..\src\vm\pc9801\pc9801.cpp"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+				</File>
+				<File
+					RelativePath="..\src\vm\pc9801\serial.cpp"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
@@ -1260,7 +1400,7 @@
 					>
 				</File>
 				<File
-					RelativePath="..\src\vm\i286.h"
+					RelativePath="..\src\vm\i386_dasm.h"
 					>
 				</File>
 				<File
@@ -1284,6 +1424,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\src\vm\i86.h"
+					>
+				</File>
+				<File
 					RelativePath="..\src\vm\io.h"
 					>
 				</File>
@@ -1293,6 +1437,10 @@
 				</File>
 				<File
 					RelativePath="..\src\vm\memory.h"
+					>
+				</File>
+				<File
+					RelativePath="..\src\vm\midi.h"
 					>
 				</File>
 				<File
@@ -1309,6 +1457,10 @@
 				</File>
 				<File
 					RelativePath="..\src\vm\pcm1bit.h"
+					>
+				</File>
+				<File
+					RelativePath="..\src\vm\pcm8bit.h"
 					>
 				</File>
 				<File
@@ -1329,6 +1481,10 @@
 				</File>
 				<File
 					RelativePath="..\src\vm\upd765a.h"
+					>
+				</File>
+				<File
+					RelativePath="..\src\vm\v30_dasm.h"
 					>
 				</File>
 				<File
@@ -1421,11 +1577,19 @@
 					>
 				</File>
 				<File
+					RelativePath="..\src\vm\pc8801\diskio.h"
+					>
+				</File>
+				<File
 					RelativePath="..\src\vm\pc8801\pc88.h"
 					>
 				</File>
 				<File
 					RelativePath="..\src\vm\pc9801\pc9801.h"
+					>
+				</File>
+				<File
+					RelativePath="..\src\vm\pc9801\serial.h"
 					>
 				</File>
 			</Filter>
@@ -1434,6 +1598,18 @@
 			Name="Resource Files"
 			Filter="ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe"
 			>
+			<File
+				RelativePath="..\src\res\indicator\access_green.bmp"
+				>
+			</File>
+			<File
+				RelativePath="..\src\res\indicator\access_off.bmp"
+				>
+			</File>
+			<File
+				RelativePath="..\src\res\indicator\access_on.bmp"
+				>
+			</File>
 			<File
 				RelativePath="..\src\res\pc98do.ico"
 				>
@@ -1462,14 +1638,6 @@
 			</File>
 			<File
 				RelativePath="..\src\res\resource.h"
-				>
-			</File>
-			<File
-				RelativePath="..\src\res\indicator\access_off.bmp"
-				>
-			</File>
-			<File
-				RelativePath="..\src\res\indicator\access_on.bmp"
 				>
 			</File>
 		</Filter>

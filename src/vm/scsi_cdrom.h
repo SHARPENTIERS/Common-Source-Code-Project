@@ -32,9 +32,11 @@ private:
 	uint32_t max_logical_block;
 	bool access;
 	
-	uint32_t cdda_start_frame, cdda_end_frame, cdda_playing_frame;
+	uint32_t cdda_start_frame, cdda_start_pregap;
+	uint32_t cdda_end_frame;
+	uint32_t cdda_playing_frame;
 	uint8_t cdda_status;
-	bool cdda_repeat, cdda_interrupt;
+	uint8_t cdda_play_mode;
 	uint8_t cdda_buffer[2352 * 75];
 	int cdda_buffer_ptr;
 	int cdda_sample_l, cdda_sample_r;
@@ -58,12 +60,14 @@ public:
 		
 		my_sprintf_s(vendor_id, 9, "NECITSU");
 		my_sprintf_s(product_id, 17, "SCSI-CDROM");
+		my_sprintf_s(product_rev, 5, "1.0");
 		device_type = 0x05; // CD-ROM drive
 		is_removable = true;
 		is_hot_swappable = false;
 //		seek_time = 400000; // 400msec (temporary)
 		seek_time = 10.0;
 		bytes_per_sec = 2048 * 75; // speed x1
+		data_req_delay = 0.1;
 		max_logical_block = 0;
 		access = false;
 		

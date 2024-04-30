@@ -12,8 +12,11 @@
 #include "memory.h"
 #include "../i8255.h"
 
-#define EVENT_HSYNC	0
-#define EVENT_BLINK	256
+#define EVENT_HDISP_TEXT_S	0
+#define EVENT_HDISP_TEXT_E	1
+#define EVENT_HDISP_GRAPH_S	2
+#define EVENT_HDISP_GRAPH_E	3
+#define EVENT_BLINK		4
 
 #define SCRN_640x400	1
 #define SCRN_640x200	2
@@ -26,6 +29,7 @@ void CRTC::initialize()
 	monitor_200line = ((config.monitor_type & 2) != 0);
 	scan_line = scan_tmp = (monitor_200line && config.scan_line);
 	monitor_digital = monitor_tmp = ((config.monitor_type & 1) != 0);
+	boot_mode = config.boot_mode;
 	
 	// thanks Mr.Sato (http://x1center.org/)
 	if(monitor_200line) {
@@ -123,14 +127,17 @@ void CRTC::initialize()
 	memset(textreg, 0, sizeof(textreg));
 	memset(cgreg, 0, sizeof(cgreg));
 	
+	textreg[0x03] = monitor_200line ? 38 : 17;
+	textreg[0x05] = textreg[0x03] + 200;
+	textreg[0x07] = monitor_200line ? 11 : 9;
+	textreg[0x08] = textreg[0x07] + 80;
+	
 	cgreg_num = 0x80;
 	cgreg[0x00] = cgreg[0x01] = cgreg[0x02] = cgreg[0x03] = cgreg[0x06] = 0xff;
 	GDEVS = 0; cgreg[0x08] = 0x00; cgreg[0x09] = 0x00;
 	GDEVE = monitor_200line ? 200 : 400; cgreg[0x0a] = GDEVE & 0xff; cgreg[0x0b] = GDEVE >> 8;
 	GDEHS = 0; cgreg[0x0c] = 0x00;
-	GDEHSC = (int)(CPU_CLOCKS * GDEHS / frames_per_sec / lines_per_frame / chars_per_line + 0.5);
 	GDEHE = 80; cgreg[0x0d] = GDEHE;
-	GDEHEC = (int)(CPU_CLOCKS * (GDEHE + 3) / frames_per_sec / lines_per_frame / chars_per_line + 0.5);
 	
 	for(int i = 0; i < 16; i++) {
 		palette_reg[i] = i;
@@ -143,15 +150,32 @@ void CRTC::initialize()
 	cg_mask256_init = false;
 	clear_flag = 0;
 	pal_select = false;
+	screen_reverse = false;
 	screen_mask = false;
 	blink = false;
 	latch[0] = latch[1] = latch[2] = latch[3] = 0;
-	hblank = vblank = false;
+	hblank_t = vblank_t = true;
+	hblank_g = vblank_g = true;
 	map_init = trans_init = true;
+	
+	// MZ-2000
+	memset(font, 0, sizeof(font));
+	vram_page = vram_mask = 0;
+	back_color = 0;
+	text_color = 7;
 	
 	// register events
 	register_vline_event(this);
 	register_event(this, EVENT_BLINK, 500000, true, NULL);
+}
+
+void CRTC::reset()
+{
+	// MZ-2000/80B
+	for(int i = 0, s = 0x6018, d = 0; i < 256; i++, d += 8, s += 32) {
+		memcpy(font + d, kanji1 + s, 8);
+	}
+	textreg[0x0f] &= ~3;
 }
 
 void CRTC::write_data8(uint32_t addr, uint32_t data)
@@ -375,11 +399,9 @@ void CRTC::write_io8(uint32_t addr, uint32_t data)
 			break;
 		case 0x0c:
 			GDEHS = cgreg[0x0c] & 0x7f;
-			GDEHSC = (int)(CPU_CLOCKS * GDEHS / frames_per_sec / lines_per_frame / chars_per_line + 0.5);
 			break;
 		case 0x0d:
 			GDEHE = cgreg[0x0d] & 0x7f;
-			GDEHEC = (int)(CPU_CLOCKS * (GDEHE + 3) / frames_per_sec / lines_per_frame / chars_per_line + 0.5);
 			break;
 		// screen size
 		case 0x0e:
@@ -426,10 +448,28 @@ void CRTC::write_io8(uint32_t addr, uint32_t data)
 		}
 		break;
 	case 0xf4:
+		// MZ-2000/80B
+		if((textreg[0x0f] & 3) == 1) {
+			back_color = data & 7;
+			break;
+		} else if((textreg[0x0f] & 3) == 2) {
+			d_mem->write_io8(addr, data);
+			vram_page = data & 7;
+			break;
+		}
 		// textreg num
 		textreg_num = data;
 		break;
 	case 0xf5:
+		// MZ-2000/80B
+		if((textreg[0x0f] & 3) == 1) {
+			text_color = data;
+			break;
+		} else if((textreg[0x0f] & 3) == 2) {
+			d_mem->write_io8(addr, data);
+			vram_page = data & 7;
+			break;
+		}
 		// text/palette reg
 		if(textreg_num < 0x10) {
 			if(textreg_num == 0) {
@@ -450,6 +490,10 @@ void CRTC::write_io8(uint32_t addr, uint32_t data)
 						palette256[i] = RGB_COLOR(r, g, b);
 					}
 					update256 = true;
+				}
+			} else if(textreg_num == 0x0f) {
+				if(textreg[0x0f] & 3) {
+					data = (data & ~3) | (textreg[0x0f] & 3);
 				}
 			}
 			textreg[textreg_num] = data;
@@ -498,6 +542,15 @@ void CRTC::write_io8(uint32_t addr, uint32_t data)
 		}
 		break;
 	case 0xf6:
+		// MZ-2000/80B
+		if((textreg[0x0f] & 3) == 1) {
+			vram_mask = data;
+			break;
+		} else if((textreg[0x0f] & 3) == 2) {
+			d_mem->write_io8(addr, data);
+			vram_page = data & 7;
+			break;
+		}
 		// cg mask reg
 		prev = cg_mask;
 		cg_mask = (data & 7) | ((data & 1) ? 8 : 0);
@@ -507,6 +560,12 @@ void CRTC::write_io8(uint32_t addr, uint32_t data)
 		}
 		break;
 	case 0xf7:
+		// MZ-2000/80B
+		if((textreg[0x0f] & 3) == 1 || (textreg[0x0f] & 3) == 2) {
+			d_mem->write_io8(addr, data);
+			vram_page = data & 7;
+			break;
+		}
 		// font size reg
 		font_size = ((data & 1) != 0);
 		break;
@@ -540,7 +599,7 @@ uint32_t CRTC::read_io8(uint32_t addr)
 	case 0xbd:
 		// read plane r
 		if(cgreg[7] & 0x10) {
-			return (vblank ? 0 : 0x80) | clear_flag;
+			return (vblank_g ? 0 : 0x80) | clear_flag;
 		} else {
 			return latch[1];
 		}
@@ -552,7 +611,7 @@ uint32_t CRTC::read_io8(uint32_t addr)
 		return latch[3];
 	case 0xf4: case 0xf5: case 0xf6: case 0xf7:
 		// get blank state
-		return (vblank ? 0 : 1) | (hblank ? 0 : 2);
+		return (vblank_t ? 0 : 1) | (hblank_t ? 0 : 2);
 	}
 	return 0xff;
 }
@@ -563,6 +622,8 @@ void CRTC::write_signal(int id, uint32_t data, uint32_t mask)
 		column_size = ((data & mask) != 0);	// from z80pio port a
 	} else if(id == SIG_CRTC_PALLETE) {
 		pal_select = ((data & mask) == 0);	// from ym2203 port a
+	} else if(id == SIG_CRTC_REVERSE) {
+		screen_reverse = ((data & mask) == 0);	// from i8255 port a
 	} else if(id == SIG_CRTC_MASK) {
 		screen_mask = ((data & mask) != 0);	// from i8255 port c
 	}
@@ -570,41 +631,63 @@ void CRTC::write_signal(int id, uint32_t data, uint32_t mask)
 
 void CRTC::event_callback(int event_id, int err)
 {
-	if(event_id & EVENT_BLINK) {
+	if(event_id == EVENT_HDISP_TEXT_S) {
+		hblank_t = false;
+		d_mem->write_signal(SIG_MEMORY_HBLANK_TEXT, 0, 1);
+	} else if(event_id == EVENT_HDISP_TEXT_E) {
+		hblank_t = true;
+		d_mem->write_signal(SIG_MEMORY_HBLANK_TEXT, 1, 1);
+	} else if(event_id == EVENT_HDISP_GRAPH_S) {
+		hblank_g = false;
+		d_mem->write_signal(SIG_MEMORY_HBLANK_GRAPH, 0, 1);
+	} else if(event_id == EVENT_HDISP_GRAPH_E) {
+		hblank_g = true;
+		d_mem->write_signal(SIG_MEMORY_HBLANK_GRAPH, 1, 1);
+	} else if(event_id == EVENT_BLINK) {
 		blink = !blink;
-	} else {
-		set_hsync(event_id);
 	}
 }
 
 void CRTC::event_vline(int v, int clock)
 {
-	bool next = !(GDEVS <= v && v < GDEVE);	// vblank = true
-	if(vblank != next) {
-		d_pio->write_signal(SIG_I8255_PORT_B, next ? 0 : 1, 1);
-		d_int->write_signal(SIG_INTERRUPT_CRTC, next ? 1 : 0, 1);
-		d_mem->write_signal(SIG_MEMORY_VBLANK, next ? 1 : 0, 1);
-		vblank = next;
+	double clocks_per_char = get_event_clocks() / frames_per_sec / lines_per_frame / chars_per_line;
+	
+	// 2022.09.05 adjust hsync timing
+	// https://twitter.com/youkan700/status/794210717398286337
+	
+	// vblank/hblank of text screen
+	if(v == textreg[5] * (monitor_200line ? 1 : 2)) {
+		d_mem->write_signal(SIG_MEMORY_VBLANK_TEXT, 1, 1);
+		vblank_t = true;
+	} else if(v == textreg[3] * (monitor_200line ? 1 : 2)) {
+		d_mem->write_signal(SIG_MEMORY_VBLANK_TEXT, 0, 1);
+		vblank_t = false;
 	}
-	// complete clear screen
-	if(v == (monitor_200line ? 200 : 400)) {
+	if((textreg[7] & 0x7f) < (textreg[8] & 0x7f)) {
+		register_event_by_clock(this, EVENT_HDISP_TEXT_S, (int)(clocks_per_char * (textreg[7] & 0x7f) + 0.5) - 2, false, NULL);
+		register_event_by_clock(this, EVENT_HDISP_TEXT_E, (int)(clocks_per_char * (textreg[8] & 0x7f) + 0.5) + 6, false, NULL);
+	} else {
+		event_callback(EVENT_HDISP_TEXT_E, 0);
+	}
+	
+	// vblank/hblank of graph screen
+	if(v == GDEVE) {
+		d_pio->write_signal(SIG_I8255_PORT_B, 0, 1);
+		d_int->write_signal(SIG_INTERRUPT_CRTC, 1, 1);
+		d_mem->write_signal(SIG_MEMORY_VBLANK_GRAPH, 1, 1);
+		vblank_g = true;
 		clear_flag = 0;
+	} else if(v == GDEVS) {
+		d_pio->write_signal(SIG_I8255_PORT_B, 1, 1);
+		d_int->write_signal(SIG_INTERRUPT_CRTC, 0, 1);
+		d_mem->write_signal(SIG_MEMORY_VBLANK_GRAPH, 0, 1);
+		vblank_g = false;
 	}
-	// register hsync events
-	int clocks_per_line = (int)(CPU_CLOCKS / frames_per_sec / lines_per_frame);
-	if(GDEHSC < GDEHEC && (GDEHEC + 10) < clocks_per_line) {
-		register_event_by_clock(this, GDEHS, GDEHSC + 10, false, NULL);
-		register_event_by_clock(this, GDEHE, GDEHEC + 10, false, NULL);
-	}
-	set_hsync(0);
-}
-
-void CRTC::set_hsync(int h)
-{
-	bool next = !(GDEHS <= h && h < GDEHE);	// hblank = true
-	if(hblank != next) {
-		d_mem->write_signal(SIG_MEMORY_HBLANK, next ? 1 : 0, 1);
-		hblank = next;
+	if(GDEHS < GDEHE) {
+		register_event_by_clock(this, EVENT_HDISP_GRAPH_S, (int)(clocks_per_char * (GDEHS + 10) + 0.5) - 2, false, NULL);
+		register_event_by_clock(this, EVENT_HDISP_GRAPH_E, (int)(clocks_per_char * (GDEHE + 10) + 0.5) + 4, false, NULL);
+	} else {
+		event_callback(EVENT_HDISP_GRAPH_E, 0);
 	}
 }
 
@@ -621,6 +704,15 @@ void CRTC::update_config()
 
 void CRTC::draw_screen()
 {
+	// MZ-2000/80B
+	if((textreg[0x0f] & 3) == 1 || boot_mode == 1) {
+		draw_screen_2000();
+		return;
+	} else if((textreg[0x0f] & 3) == 2 || boot_mode == 2) {
+		draw_screen_80b();
+		return;
+	}
+	
 	// update config
 	scan_line = scan_tmp;
 	
@@ -962,10 +1054,10 @@ void CRTC::draw_40column_screen()
 			uint32_t dest = 640 * y;
 			uint8_t col;
 			for(int x = 0; x < 640; x++) {
-				if((text[src1] & 8) && (text[src2] & 8)) {
+				// thanks Mr.Koucha-Youkan
+				col = (((text[src1] & 7) << 3) | (text[src2] & 7)) + 16;
+				if(col == 16 && ((text[src1] & 8) && (text[src2] & 8))) {
 					col = 8; // non transparent black
-				} else {
-					col = (((text[src1] & 7) << 3) | (text[src2] & 7)) + 16;
 				}
 				text[dest++] = col;
 				src1++;
@@ -1622,7 +1714,7 @@ void CRTC::draw_640x200x16screen(uint8_t pl)
 		create_addr_map(80, 200);
 	}
 	ex = (cgreg[0x0e] & 0x80) << 7;
-	subplane = (pl & 1) ? 0x2000 : 0x0000;
+	subplane = (pl & 1) ? 0x4000 : 0x0000; // thanks Mr.856
 	for(int y = 0; y < 200; y++) {
 		for(int x = 0; x < 80; x++) {
 			uint16_t src = (map_addr[y][x] ^ subplane) | ex;
@@ -1735,7 +1827,178 @@ void CRTC::create_addr_map(int xmax, int ymax)
 	map_init = false;
 }
 
-#define STATE_VERSION	1
+// ----------------------------------------------------------------------------
+// draw screen (MZ-2000/80B)
+// ----------------------------------------------------------------------------
+
+void CRTC::draw_screen_2000()
+{
+	scrntype_t palette_color[8];
+	
+	for(int i = 0; i < 8; i++) {
+		palette_color[i] = RGB_COLOR((i & 2) ? 255 : 0, (i & 4) ? 255 : 0, (i & 1) ? 255 : 0);
+	}
+	
+	// render text
+	uint8_t color = (text_color & 7) ? (text_color & 7) : 8;
+	
+	for(int y = 0, addr = 0; y < 200; y += 8) {
+		for(int x = 0; x < (column_size ? 80 : 40); x++) {
+			uint8_t code = tvram1[addr++];
+			for(int l = 0; l < 8; l++) {
+				uint8_t pat = font[(code << 3) + l];
+				uint8_t* d = &screen_txt[y + l][x << 3];
+				
+				d[0] = (pat & 0x80) ? color : 0;
+				d[1] = (pat & 0x40) ? color : 0;
+				d[2] = (pat & 0x20) ? color : 0;
+				d[3] = (pat & 0x10) ? color : 0;
+				d[4] = (pat & 0x08) ? color : 0;
+				d[5] = (pat & 0x04) ? color : 0;
+				d[6] = (pat & 0x02) ? color : 0;
+				d[7] = (pat & 0x01) ? color : 0;
+			}
+		}
+	}
+	
+	// render graphics
+//	if(config.monitor_type != MONITOR_TYPE_COLOR && (vram_mask & 8)) {
+//		memset(screen_gra, 0, sizeof(screen_gra));
+//	} else {
+		for(int y = 0, addr = 0; y < 200; y++) {
+			for(int x = 0; x < 80; x++) {
+				uint8_t b = (vram_mask & 1) ? vram_r[addr] : 0;
+				uint8_t r = (vram_mask & 2) ? vram_g[addr] : 0;
+				uint8_t g = (vram_mask & 4) ? vram_i[addr] : 0;
+				addr++;
+				uint8_t* d = &screen_gra[y][x << 3];
+				
+				d[0] = ((b & 0x01) >> 0) | ((r & 0x01) << 1) | ((g & 0x01) << 2);
+				d[1] = ((b & 0x02) >> 1) | ((r & 0x02) >> 0) | ((g & 0x02) << 1);
+				d[2] = ((b & 0x04) >> 2) | ((r & 0x04) >> 1) | ((g & 0x04) >> 0);
+				d[3] = ((b & 0x08) >> 3) | ((r & 0x08) >> 2) | ((g & 0x08) >> 1);
+				d[4] = ((b & 0x10) >> 4) | ((r & 0x10) >> 3) | ((g & 0x10) >> 2);
+				d[5] = ((b & 0x20) >> 5) | ((r & 0x20) >> 4) | ((g & 0x20) >> 3);
+				d[6] = ((b & 0x40) >> 6) | ((r & 0x40) >> 5) | ((g & 0x40) >> 4);
+				d[7] = ((b & 0x80) >> 7) | ((r & 0x80) >> 6) | ((g & 0x80) >> 5);
+			}
+		}
+//	}
+	
+	// copy to real screen
+	emu->set_vm_screen_lines(200);
+	
+	for(int y = 0; y < 200; y++) {
+		scrntype_t* dest0 = emu->get_screen_buffer(y * 2 + 0);
+		scrntype_t* dest1 = emu->get_screen_buffer(y * 2 + 1);
+		uint8_t* src_txt = screen_txt[y];
+		uint8_t* src_gra = screen_gra[y];
+		
+		// VGATE (Forces display to be blank) or Reverse
+		if(screen_mask || screen_reverse) {
+			for(int x = 0; x < 640; x++) {
+				dest0[x] = 0;
+			}
+		} else {
+			if(text_color & 8) {
+				// graphics > text
+				for(int x = 0; x < 640; x++) {
+					uint8_t txt = src_txt[column_size ? x : (x >> 1)], gra = src_gra[x];
+					dest0[x] = palette_color[gra ? gra : txt ? (txt & 7) : back_color];
+				}
+			} else {
+				// text > graphics
+				for(int x = 0; x < 640; x++) {
+					uint8_t txt = src_txt[column_size ? x : (x >> 1)], gra = src_gra[x];
+					dest0[x] = palette_color[txt ? (txt & 7) : gra ? gra : back_color];
+				}
+			}
+		}
+		if(config.scan_line) {
+			memset(dest1, 0, 640 * sizeof(scrntype_t));
+		} else {
+			my_memcpy(dest1, dest0, 640 * sizeof(scrntype_t));
+		}
+	}
+	emu->screen_skip_line(true);
+}
+
+void CRTC::draw_screen_80b()
+{
+	scrntype_t palette_green[2];
+	
+	palette_green[screen_reverse ? 1 : 0] = RGB_COLOR(0, 0, 0);
+	palette_green[screen_reverse ? 0 : 1] = RGB_COLOR(0, 255, 0);
+	
+	// render text
+	uint8_t color = 1;
+	
+	for(int y = 0, addr = 0; y < 200; y += 8) {
+		for(int x = 0; x < (column_size ? 80 : 40); x++) {
+			uint8_t code = tvram1[addr++];
+			for(int l = 0; l < 8; l++) {
+				uint8_t pat = font[(code << 3) + l];
+				uint8_t* d = &screen_txt[y + l][x << 3];
+				
+				d[0] = (pat & 0x80) ? color : 0;
+				d[1] = (pat & 0x40) ? color : 0;
+				d[2] = (pat & 0x20) ? color : 0;
+				d[3] = (pat & 0x10) ? color : 0;
+				d[4] = (pat & 0x08) ? color : 0;
+				d[5] = (pat & 0x04) ? color : 0;
+				d[6] = (pat & 0x02) ? color : 0;
+				d[7] = (pat & 0x01) ? color : 0;
+			}
+		}
+	}
+	
+	// render graphics
+	if(!(vram_page & 6)) {
+		memset(screen_gra, 0, sizeof(screen_gra));
+	} else {
+		for(int y = 0, addr = 0; y < 200; y++) {
+			for(int x = 0; x < 40; x++) {
+				uint8_t pat;
+				pat  = (vram_page & 2) ? vram_b[addr] : 0;
+				pat |= (vram_page & 4) ? vram_r[addr] : 0;
+				addr++;
+				uint8_t* d = &screen_gra[y][x << 3];
+				
+				d[0] = (pat & 0x01) >> 0;
+				d[1] = (pat & 0x02) >> 1;
+				d[2] = (pat & 0x04) >> 2;
+				d[3] = (pat & 0x08) >> 3;
+				d[4] = (pat & 0x10) >> 4;
+				d[5] = (pat & 0x20) >> 5;
+				d[6] = (pat & 0x40) >> 6;
+				d[7] = (pat & 0x80) >> 7;
+			}
+		}
+	}
+	
+	// copy to real screen
+	emu->set_vm_screen_lines(200);
+	
+	for(int y = 0; y < 200; y++) {
+		scrntype_t* dest0 = emu->get_screen_buffer(y * 2 + 0);
+		scrntype_t* dest1 = emu->get_screen_buffer(y * 2 + 1);
+		uint8_t* src_txt = screen_txt[y];
+		uint8_t* src_gra = screen_gra[y];
+		
+		for(int x = 0; x < 640; x++) {
+			uint8_t txt = src_txt[column_size ? x : (x >> 1)], gra = src_gra[x >> 1];
+			dest0[x] = palette_green[(txt || gra) ? 1 : 0];
+		}
+		if(config.scan_line) {
+			memset(dest1, 0, 640 * sizeof(scrntype_t));
+		} else {
+			my_memcpy(dest1, dest0, 640 * sizeof(scrntype_t));
+		}
+	}
+	emu->screen_skip_line(true);
+}
+
+#define STATE_VERSION	2
 
 bool CRTC::process_state(FILEIO* state_fio, bool loading)
 {
@@ -1750,6 +2013,7 @@ bool CRTC::process_state(FILEIO* state_fio, bool loading)
 	state_fio->StateValue(monitor_200line);
 	state_fio->StateValue(monitor_digital);
 	state_fio->StateValue(monitor_tmp);
+	state_fio->StateValue(boot_mode);
 	state_fio->StateValue(textreg_num);
 	state_fio->StateArray(textreg, sizeof(textreg), 1);
 	state_fio->StateValue(cgreg_num);
@@ -1765,14 +2029,15 @@ bool CRTC::process_state(FILEIO* state_fio, bool loading)
 	state_fio->StateValue(GDEVE);
 	state_fio->StateValue(GDEHS);
 	state_fio->StateValue(GDEHE);
-	state_fio->StateValue(GDEHSC);
-	state_fio->StateValue(GDEHEC);
-	state_fio->StateValue(hblank);
-	state_fio->StateValue(vblank);
+	state_fio->StateValue(hblank_t);
+	state_fio->StateValue(vblank_t);
+	state_fio->StateValue(hblank_g);
+	state_fio->StateValue(vblank_g);
 	state_fio->StateValue(blink);
 	state_fio->StateValue(clear_flag);
 	state_fio->StateArray(palette_reg, sizeof(palette_reg), 1);
 	state_fio->StateValue(pal_select);
+	state_fio->StateValue(screen_reverse);
 	state_fio->StateValue(screen_mask);
 	state_fio->StateArray(&priority16[0][0], sizeof(priority16), 1);
 	state_fio->StateArray(palette16, sizeof(palette16), 1);
@@ -1799,6 +2064,10 @@ bool CRTC::process_state(FILEIO* state_fio, bool loading)
 	state_fio->StateValue(trans_color);
 	state_fio->StateValue(map_init);
 	state_fio->StateValue(trans_init);
+	state_fio->StateValue(vram_page);
+	state_fio->StateValue(vram_mask);
+	state_fio->StateValue(back_color);
+	state_fio->StateValue(text_color);
 	return true;
 }
 

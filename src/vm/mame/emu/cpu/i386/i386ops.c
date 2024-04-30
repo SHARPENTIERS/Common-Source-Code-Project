@@ -2332,7 +2332,7 @@ static void I386OP(int)(i386_state *cpustate)               // Opcode 0xcd
 {
 	int interrupt = FETCH(cpustate);
 	CYCLES(cpustate,CYCLES_INT);
-#ifdef I386_PSEUDO_BIOS
+#ifdef I86_PSEUDO_BIOS
 	BIOS_INT(interrupt)
 #endif
 	cpustate->ext = 0; // not an external interrupt

@@ -8,7 +8,7 @@
 	Author : Takeda.Toshiya
 	Date   : 2009.03.11-
 
-	[ PC-Eninge ]
+	[ PC-Engine ]
 */
 
 #include <math.h>
@@ -2096,10 +2096,12 @@ uint8_t PCE::cdrom_read(uint16_t addr)
 	switch(addr & 0x0f) {
 	case 0x00:  /* CDC status */
 		data = 0;
+#ifdef _PCENGINE
 		if(d_cpu->get_pc() == 0xf34b) {
 			// XXX: Hack to wait the CD-DA will be finished for the Manhole
 			data |= d_scsi_cdrom->read_signal(SIG_SCSI_CDROM_PLAYING) ? 0x80 : 0;
 		}
+#endif
 		data |= d_scsi_host->read_signal(SIG_SCSI_BSY) ? 0x80 : 0;
 		data |= d_scsi_host->read_signal(SIG_SCSI_REQ) ? 0x40 : 0;
 		data |= d_scsi_host->read_signal(SIG_SCSI_MSG) ? 0x20 : 0;
@@ -2408,7 +2410,7 @@ void PCE::write_signal(int id, uint32_t data, uint32_t mask)
 					set_cdrom_irq_line(PCE_CD_IRQ_SAMPLE_HALF_PLAY, ASSERT_LINE);
 				} else if((msm_start_addr & 0xffff) == msm_end_addr) {
 					// reached to end address
-					if(adpcm_dma_enabled) {
+					if(adpcm_dma_enabled && adpcm_length == 0xffff) {
 						// restart streaming
 						set_cdrom_irq_line(PCE_CD_IRQ_SAMPLE_HALF_PLAY, CLEAR_LINE);
 						set_cdrom_irq_line(PCE_CD_IRQ_SAMPLE_FULL_PLAY, CLEAR_LINE);

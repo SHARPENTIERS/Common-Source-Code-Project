@@ -3385,7 +3385,7 @@ static CPU_EXECUTE( i386 )
 		}
 #endif
 		if (cycles == -1) {
-			int passed_cycles = max(1, cpustate->extra_cycles);
+			int passed_cycles = max(5, cpustate->extra_cycles); // 80386 CPI: 4.9
 			// this is main cpu, cpustate->cycles is not used
 			/*cpustate->cycles = */cpustate->extra_cycles = 0;
 			cpustate->tsc += passed_cycles;

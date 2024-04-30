@@ -65,12 +65,15 @@ private:
 	uint32_t orig_crc32;
 	bool trim_required;
 	
+	bool is_d8e_image;
 	bool is_1dd_image;
 	bool is_solid_image;
 	bool is_fdi_image;
 	uint8_t fdi_header[4096];
 	int solid_ncyl, solid_nside, solid_nsec, solid_size;
 	bool solid_mfm;
+	int solid_nsec2, solid_size2;
+	bool solid_mfm2;
 	
 	void set_sector_info(uint8_t *t);
 	void trim_buffer();
@@ -90,12 +93,15 @@ private:
 	
 	// solid image decoder (fdi/hdm/xdf/2d/img/sf7/tfd)
 	bool solid_to_d88(FILEIO *fio, int type, int ncyl, int nside, int nsec, int size, bool mfm);
+	bool solid_to_d88(FILEIO *fio, int type, int ncyl, int nside, int nsec, int size, bool mfm, int nsec2, int size2, bool mfm2);
 	
 	// internal routines for track
 	bool get_track_tmp(int trk, int side);
 	bool make_track_tmp(int trk, int side);
 	bool get_sector_tmp(int trk, int side, int index);
-	bool get_sector_info_tmp(int trk, int side, int index, uint8_t *c, uint8_t *h, uint8_t *r, uint8_t *n, int *length);
+	int get_track_num(uint8_t *t);
+	uint8_t *get_unstable_sector(uint8_t *t, int index);
+	bool get_sector_info_tmp(int trk, int side, int index, uint8_t *c, uint8_t *h, uint8_t *r, uint8_t *n, bool *mfm, int *length);
 	bool format_track_tmp(int trk, int side);
 	
 public:
@@ -109,7 +115,7 @@ public:
 		is_special_disk = 0;
 		file_size.d = 0;
 		sector_size.sd = sector_num.sd = 0;
-		sector = NULL;
+		sector = unstable = NULL;
 		drive_type = DRIVE_TYPE_UNK;
 		drive_rpm = 0;
 		drive_mfm = true;
@@ -130,6 +136,10 @@ public:
 	void open(const _TCHAR* file_path, int bank);
 	void close();
 #ifdef _ANY2D88
+	bool is_d8e()
+	{
+		return is_d8e_image;
+	}
 	bool open_as_1dd;
 	bool open_as_256;
 	void save_as_d88(const _TCHAR* file_path);
@@ -137,7 +147,7 @@ public:
 	bool get_track(int trk, int side);
 	bool make_track(int trk, int side);
 	bool get_sector(int trk, int side, int index);
-	bool get_sector_info(int trk, int side, int index, uint8_t *c, uint8_t *h, uint8_t *r, uint8_t *n, int *length);
+	bool get_sector_info(int trk, int side, int index, uint8_t *c, uint8_t *h, uint8_t *r, uint8_t *n, bool *mfm, int *length);
 	void set_deleted(bool value);
 	void set_data_crc_error(bool value);
 	void set_data_mark_missing();
@@ -178,9 +188,10 @@ public:
 	
 	// sector
 	uint8_t* sector;
+	uint8_t* unstable;
 	pair32_t sector_size;
 	uint8_t id[6];
-	uint8_t density;
+	bool sector_mfm;
 	bool deleted;
 	bool addr_crc_error;
 	bool data_crc_error;

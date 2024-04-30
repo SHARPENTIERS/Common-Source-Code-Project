@@ -115,6 +115,7 @@
 #define ID_CPU_POWER3                   40014
 #define ID_CPU_POWER4                   40015
 #define ID_FULL_SPEED                   40016
+#define ID_DRIVE_VM_IN_OPECODE          40017
 #define ID_AUTOKEY_START                40021
 #define ID_AUTOKEY_STOP                 40022
 #define ID_ROMAJI_TO_KANA               40023
@@ -279,8 +280,9 @@
 #define ID_VM_SOUND_TYPE7               41118
 #define ID_VM_SOUND_NOISE_FDD           41121
 #define ID_VM_SOUND_NOISE_CMT           41122
-#define ID_VM_SOUND_PLAY_TAPE           41123
-#define ID_VM_SOUND_MENU_END            41123
+#define ID_VM_SOUND_TAPE_SIGNAL         41123
+#define ID_VM_SOUND_TAPE_VOICE          41124
+#define ID_VM_SOUND_MENU_END            41124
 
 #define ID_VM_MONITOR_MENU_START        41131
 #define ID_VM_MONITOR_TYPE0             41131
@@ -292,7 +294,8 @@
 #define ID_VM_MONITOR_TYPE6             41137
 #define ID_VM_MONITOR_TYPE7             41138
 #define ID_VM_MONITOR_SCANLINE          41139
-#define ID_VM_MONITOR_MENU_END          41139
+#define ID_VM_MONITOR_SCANLINE_AUTO     41140
+#define ID_VM_MONITOR_MENU_END          41140
 
 #define ID_VM_PRINTER_MENU_START        41141
 #define ID_VM_PRINTER_TYPE0             41141
@@ -305,6 +308,17 @@
 #define ID_VM_PRINTER_TYPE7             41148
 #define ID_VM_PRINTER_MENU_END          41148
 
+#define ID_VM_SERIAL_MENU_START         41151
+#define ID_VM_SERIAL_TYPE0              41151
+#define ID_VM_SERIAL_TYPE1              41152
+#define ID_VM_SERIAL_TYPE2              41153
+#define ID_VM_SERIAL_TYPE3              41154
+#define ID_VM_SERIAL_TYPE4              41155
+#define ID_VM_SERIAL_TYPE5              41156
+#define ID_VM_SERIAL_TYPE6              41157
+#define ID_VM_SERIAL_TYPE7              41158
+#define ID_VM_SERIAL_MENU_END           41158
+
 #define ID_HOST_MENU_START              41201
 #define ID_HOST_REC_MOVIE_60FPS         41201
 #define ID_HOST_REC_MOVIE_30FPS         41202
@@ -312,12 +326,13 @@
 #define ID_HOST_REC_SOUND               41204
 #define ID_HOST_REC_STOP                41205
 #define ID_HOST_CAPTURE_SCREEN          41206
-#define ID_HOST_USE_D3D9                41207
-#define ID_HOST_WAIT_VSYNC              41208
-#define ID_HOST_USE_DINPUT              41209
-#define ID_HOST_DISABLE_DWM             41210
-#define ID_HOST_SHOW_STATUS_BAR         41211
-#define ID_HOST_MENU_END                41211
+#define ID_HOST_USE_D2D1                41207
+#define ID_HOST_USE_D3D9                41208
+#define ID_HOST_WAIT_VSYNC              41209
+#define ID_HOST_USE_DINPUT              41210
+#define ID_HOST_DISABLE_DWM             41211
+#define ID_HOST_SHOW_STATUS_BAR         41212
+#define ID_HOST_MENU_END                41212
 
 #define ID_SCREEN_MENU_START            41301
 #define ID_SCREEN_WINDOW                41301 // 41601-41610
@@ -608,59 +623,83 @@
 #define ID_HD1_MENU_START               45001
 #define ID_OPEN_HD1                     45001
 #define ID_CLOSE_HD1                    45002
-#define ID_RECENT_HD1                   45003 // 45003-45010
-#define ID_HD1_MENU_END                 45010
+#define ID_OPEN_BLANK_20MB_HD1          45003
+#define ID_OPEN_BLANK_20MB_1024_HD1     45004
+#define ID_OPEN_BLANK_40MB_HD1          45005
+#define ID_RECENT_HD1                   45006 // 45006-45013
+#define ID_HD1_MENU_END                 45013
 
-#define ID_HD2_MENU_START               45011
-#define ID_OPEN_HD2                     45011
-#define ID_CLOSE_HD2                    45012
-#define ID_RECENT_HD2                   45013 // 45013-45020
-#define ID_HD2_MENU_END                 45020
+#define ID_HD2_MENU_START               45021
+#define ID_OPEN_HD2                     45021
+#define ID_CLOSE_HD2                    45022
+#define ID_OPEN_BLANK_20MB_HD2          45023
+#define ID_OPEN_BLANK_20MB_1024_HD2     45024
+#define ID_OPEN_BLANK_40MB_HD2          45025
+#define ID_RECENT_HD2                   45026 // 45026-45033
+#define ID_HD2_MENU_END                 45033
 
-#define ID_HD3_MENU_START               45021
-#define ID_OPEN_HD3                     45021
-#define ID_CLOSE_HD3                    45022
-#define ID_RECENT_HD3                   45023 // 45023-45030
-#define ID_HD3_MENU_END                 45030
+#define ID_HD3_MENU_START               45041
+#define ID_OPEN_HD3                     45041
+#define ID_CLOSE_HD3                    45042
+#define ID_OPEN_BLANK_20MB_HD3          45043
+#define ID_OPEN_BLANK_20MB_1024_HD3     45044
+#define ID_OPEN_BLANK_40MB_HD3          45045
+#define ID_RECENT_HD3                   45046 // 45046-45053
+#define ID_HD3_MENU_END                 45053
 
-#define ID_HD4_MENU_START               45031
-#define ID_OPEN_HD4                     45031
-#define ID_CLOSE_HD4                    45032
-#define ID_RECENT_HD4                   45033 // 45033-45040
-#define ID_HD4_MENU_END                 45040
+#define ID_HD4_MENU_START               45061
+#define ID_OPEN_HD4                     45061
+#define ID_CLOSE_HD4                    45062
+#define ID_OPEN_BLANK_20MB_HD4          45063
+#define ID_OPEN_BLANK_20MB_1024_HD4     45064
+#define ID_OPEN_BLANK_40MB_HD4          45065
+#define ID_RECENT_HD4                   45066 // 45066-45073
+#define ID_HD4_MENU_END                 45073
 
-#define ID_HD5_MENU_START               45041
-#define ID_OPEN_HD5                     45041
-#define ID_CLOSE_HD5                    45042
-#define ID_RECENT_HD5                   45043 // 45003-45010
-#define ID_HD5_MENU_END                 45050
+#define ID_HD5_MENU_START               45081
+#define ID_OPEN_HD5                     45081
+#define ID_CLOSE_HD5                    45082
+#define ID_OPEN_BLANK_20MB_HD5          45083
+#define ID_OPEN_BLANK_20MB_1024_HD5     45084
+#define ID_OPEN_BLANK_40MB_HD5          45085
+#define ID_RECENT_HD5                   45086 // 45086-45093
+#define ID_HD5_MENU_END                 45093
 
-#define ID_HD6_MENU_START               45051
-#define ID_OPEN_HD6                     45051
-#define ID_CLOSE_HD6                    45052
-#define ID_RECENT_HD6                   45053 // 45013-45020
-#define ID_HD6_MENU_END                 45060
+#define ID_HD6_MENU_START               45101
+#define ID_OPEN_HD6                     45101
+#define ID_CLOSE_HD6                    45102
+#define ID_OPEN_BLANK_20MB_HD6          45103
+#define ID_OPEN_BLANK_20MB_1024_HD6     45104
+#define ID_OPEN_BLANK_40MB_HD6          45105
+#define ID_RECENT_HD6                   45106 // 45106-45113
+#define ID_HD6_MENU_END                 45113
 
-#define ID_HD7_MENU_START               45061
-#define ID_OPEN_HD7                     45061
-#define ID_CLOSE_HD7                    45062
-#define ID_RECENT_HD7                   45063 // 45023-45030
-#define ID_HD7_MENU_END                 45070
+#define ID_HD7_MENU_START               45121
+#define ID_OPEN_HD7                     45121
+#define ID_CLOSE_HD7                    45122
+#define ID_OPEN_BLANK_20MB_HD7          45123
+#define ID_OPEN_BLANK_20MB_1024_HD7     45124
+#define ID_OPEN_BLANK_40MB_HD7          45125
+#define ID_RECENT_HD7                   45126 // 45126-45133
+#define ID_HD7_MENU_END                 45133
 
-#define ID_HD8_MENU_START               45071
-#define ID_OPEN_HD8                     45071
-#define ID_CLOSE_HD8                    45072
-#define ID_RECENT_HD8                   45073 // 45033-45040
-#define ID_HD8_MENU_END                 45080
+#define ID_HD8_MENU_START               45141
+#define ID_OPEN_HD8                     45141
+#define ID_CLOSE_HD8                    45142
+#define ID_OPEN_BLANK_20MB_HD8          45143
+#define ID_OPEN_BLANK_20MB_1024_HD8     45144
+#define ID_OPEN_BLANK_40MB_HD8          45145
+#define ID_RECENT_HD8                   45146 // 45146-45153
+#define ID_HD8_MENU_END                 45153
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        215
-#define _APS_NEXT_COMMAND_VALUE         44059
+#define _APS_NEXT_COMMAND_VALUE         45154
 #define _APS_NEXT_CONTROL_VALUE         1003
-#define _APS_NEXT_SYMED_VALUE           101
+#define _APS_NEXT_SYMED_VALUE           108
 #endif
 #endif
 

@@ -10,12 +10,12 @@
 #ifndef _FM16BETA_H_
 #define _FM16BETA_H_
 
-#if defined(HAS_I286)
-#define DEVICE_NAME		"FUJITSU FM16beta (i286)"
-#define CONFIG_NAME		"fm16beta_i286"
-#else
+#if defined(HAS_I186)
 #define DEVICE_NAME		"FUJITSU FM16beta (i186)"
 #define CONFIG_NAME		"fm16beta_i186"
+#elif defined(HAS_I286)
+#define DEVICE_NAME		"FUJITSU FM16beta (i286)"
+#define CONFIG_NAME		"fm16beta_i286"
 #endif
 
 // device informations for virtual machine
@@ -31,18 +31,8 @@
 #define SCREEN_HEIGHT		400
 #define WINDOW_HEIGHT_ASPECT	480
 #define MAX_DRIVE		4
-#define I8259_MAX_CHIPS		2
 #define SINGLE_MODE_DMA
 //#define MB8877_NO_BUSY_AFTER_SEEK
-
-#if defined(HAS_I286)
-#define MEMORY_ADDR_MAX		0x1000000	// 16MB
-#else
-#define MEMORY_ADDR_MAX		0x100000	// 1MB
-#endif
-#define MEMORY_BANK_SIZE	0x4000
-
-#define IO_ADDR_MAX		0x10000
 
 // device informations for win32
 #define USE_FLOPPY_DISK		4
@@ -72,7 +62,11 @@ class HD46505;
 class I8237;
 class I8251;
 class I8259;
+#if defined(HAS_I186)
+class I86;
+#elif defined(HAS_I286)
 class I286;
+#endif
 class IO;
 class MB8877;
 class MC6809;
@@ -97,7 +91,11 @@ protected:
 	I8237* dma;
 	I8251* sio;
 	I8259* pic;
+#if defined(HAS_I186)
+	I86* cpu;
+#elif defined(HAS_I286)
 	I286* cpu;
+#endif
 	IO* io;
 	MB8877* fdc_2hd;
 	MB8877* fdc_2d;

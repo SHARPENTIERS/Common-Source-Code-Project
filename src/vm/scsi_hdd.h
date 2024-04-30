@@ -20,6 +20,7 @@ private:
 	HARDDISK* disk[8];
 	_TCHAR image_path[8][_MAX_PATH];
 	int sector_size[8];
+	uint64_t cur_position[8];
 	
 public:
 	SCSI_HDD(VM_TEMPLATE* parent_vm, EMU* parent_emu) : SCSI_DEV(parent_vm, parent_emu)
@@ -30,10 +31,14 @@ public:
 		}
 		my_sprintf_s(vendor_id, 9, "NECITSU");
 		my_sprintf_s(product_id, 17, "SCSI-HDD");
+		my_sprintf_s(product_rev, 5, "1.0");
 		device_type = 0x00;
-		is_removable = is_hot_swappable = false;
+		is_removable = false;
+		is_hot_swappable = true; //false;
 		seek_time = 10000; // 10msec
 		bytes_per_sec = 0x500000; // 5MB/sec
+		data_req_delay = 0.1;
+		step_period = 3000; // 3ms
 		
 		set_device_name(_T("SCSI Hard Disk Drive"));
 	}
@@ -51,6 +56,7 @@ public:
 	uint32_t max_logical_block_addr();
 	bool read_buffer(int length);
 	bool write_buffer(int length);
+	double get_seek_time(uint64_t new_position, uint64_t length);
 	
 	// unique functions
 	void set_disk_handler(int drv, HARDDISK* device)
@@ -70,6 +76,8 @@ public:
 	void close(int drv);
 	bool mounted(int drv);
 	bool accessed(int drv);
+	
+	int step_period;
 };
 
 class SASI_HDD : public SCSI_HDD
@@ -83,6 +91,7 @@ public:
 	
 	// virtual scsi functions
 	void start_command();
+	bool write_buffer(int length);
 };
 
 #endif

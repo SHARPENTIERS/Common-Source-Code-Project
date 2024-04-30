@@ -36,18 +36,7 @@
 #define MAX_DRIVE		2
 #define UPD765A_SENCE_INTSTAT_RESULT
 #define UPD765A_EXT_DRVSEL
-#ifdef TYPE_SL
-#define HAS_I86
-#define I8259_MAX_CHIPS		1
-#else
-#define HAS_I286
-#define I8259_MAX_CHIPS		2
-#endif
-#if !(defined(_J3100SS) || defined(_J3100SE))
-#define HAS_I8254
-#endif
 #define SINGLE_MODE_DMA
-#define IO_ADDR_MAX		0x10000
 
 // device informations for win32
 #define USE_FLOPPY_DISK		2
@@ -76,7 +65,11 @@ class I8237;
 //class I8250;
 class I8253;
 class I8259;
+#ifdef TYPE_SL
+class I86;
+#else
 class I286;
+#endif
 class IO;
 class PCM1BIT;
 class UPD765A;
@@ -107,7 +100,11 @@ protected:
 //	I8250* sio;
 	I8253* pit;
 	I8259* pic;
+#ifdef TYPE_SL
+	I86* cpu;
+#else
 	I286* cpu;
+#endif
 	IO* io;
 	PCM1BIT* pcm;
 	UPD765A* fdc;

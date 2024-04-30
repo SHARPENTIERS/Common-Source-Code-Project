@@ -27,7 +27,8 @@ EMU* emu;
 HMENU hMenu = NULL;
 bool now_menuloop = false;
 
-void update_menu(HWND hWnd, HMENU hMenu);
+void update_toplevel_menu(HWND hWnd, HMENU hMenu);
+void update_popup_menu(HWND hWnd, HMENU hMenu);
 void show_menu_bar(HWND hWnd);
 void hide_menu_bar(HWND hWnd);
 
@@ -37,6 +38,7 @@ bool status_bar_visible = false;
 
 #ifdef USE_FLOPPY_DISK
 uint32_t fd_status = 0x80000000;
+uint32_t fd_indicator_color = 0x80000000;
 #endif
 #ifdef USE_QUICK_DISK
 uint32_t qd_status = 0x80000000;
@@ -68,10 +70,8 @@ void open_recent_cart(int drv, int index);
 #ifdef USE_FLOPPY_DISK
 void open_floppy_disk_dialog(HWND hWnd, int drv);
 void open_blank_floppy_disk_dialog(HWND hWnd, int drv, uint8_t type);
-void open_floppy_disk(int drv, const _TCHAR* path, int bank);
 void open_recent_floppy_disk(int drv, int index);
 void select_d88_bank(int drv, int index);
-void close_floppy_disk(int drv);
 #endif
 #ifdef USE_QUICK_DISK
 void open_quick_disk_dialog(HWND hWnd, int drv);
@@ -80,6 +80,7 @@ void open_recent_quick_disk(int drv, int index);
 #ifdef USE_HARD_DISK
 void open_hard_disk_dialog(HWND hWnd, int drv);
 void open_recent_hard_disk(int drv, int index);
+void open_blank_hard_disk_dialog(HWND hWnd, int drv, int sector_size, int sectors, int surfaces, int cylinders);
 #endif
 #ifdef USE_TAPE
 void open_tape_dialog(HWND hWnd, int drv, bool play);
@@ -134,12 +135,13 @@ void start_auto_key();
 #endif
 
 // dialog
+// thanks Marukun (64bit)
 #ifdef USE_SOUND_VOLUME
-BOOL CALLBACK VolumeWndProc(HWND hDlg, UINT iMsg, WPARAM wParam, LPARAM lParam);
+INT_PTR CALLBACK VolumeWndProc(HWND hDlg, UINT iMsg, WPARAM wParam, LPARAM lParam);
 #endif
 #ifdef USE_JOYSTICK
-BOOL CALLBACK JoyWndProc(HWND hDlg, UINT iMsg, WPARAM wParam, LPARAM lParam);
-BOOL CALLBACK JoyToKeyWndProc(HWND hDlg, UINT iMsg, WPARAM wParam, LPARAM lParam);
+INT_PTR CALLBACK JoyWndProc(HWND hDlg, UINT iMsg, WPARAM wParam, LPARAM lParam);
+INT_PTR CALLBACK JoyToKeyWndProc(HWND hDlg, UINT iMsg, WPARAM wParam, LPARAM lParam);
 #endif
 
 // buttons
@@ -190,13 +192,6 @@ void update_socket(int ch, WPARAM wParam, LPARAM lParam)
 		emu->recv_socket_data(ch);
 		break;
 	}
-}
-#endif
-
-#ifdef USE_STATE
-const _TCHAR *state_file_path(int num)
-{
-	return create_local_path(_T("%s.sta%d"), _T(CONFIG_NAME), num);
 }
 #endif
 
@@ -290,11 +285,14 @@ int WINAPI _tWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR szCmdL
 	emu = new EMU(hWnd, hInstance);
 	emu->set_host_window_size(WINDOW_WIDTH, WINDOW_HEIGHT, true);
 	
+	// update top-level menu for emulator settings
+	update_toplevel_menu(hWnd, hMenu);
+	
 #ifdef SUPPORT_DRAG_DROP
 	// open command line path
 	if(szCmdLine[0]) {
 		if(szCmdLine[0] == _T('"')) {
-			int len = _tcslen(szCmdLine);
+			int len = (int)_tcslen(szCmdLine);
 			szCmdLine[len - 1] = _T('\0');
 			szCmdLine++;
 		}
@@ -318,19 +316,36 @@ int WINAPI _tWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR szCmdL
 	
 	while(1) {
 		// check window message
-		if(PeekMessage(&msg, NULL, 0, 0, PM_NOREMOVE)) {
-			if(!GetMessage(&msg, NULL, 0, 0)) {
+		DWORD start_time = timeGetTime();
+		DWORD end_time = start_time;
+		
+		while(1) {
+			if(PeekMessage(&msg, NULL, 0, 0, PM_NOREMOVE)) {
+				if(!GetMessage(&msg, NULL, 0, 0)) {
 #ifdef _DEBUG
-				_CrtDumpMemoryLeaks();
+					_CrtDumpMemoryLeaks();
 #endif
-				ExitProcess(0);	// trick
-				return msg.wParam;
+					ExitProcess(0);	// trick
+					return (int)msg.wParam;
+				}
+				if(msg.message == WM_KEYUP) {
+					if(LOBYTE(msg.wParam) == 0x10) {
+						end_time = start_time + 10;
+					}
+				} else if(msg.message == WM_KEYDOWN) {
+					if(LOBYTE(msg.wParam) != 0x10) {
+						end_time = start_time;
+					}
+				}
+				if(!TranslateAccelerator(hWnd, hAccel, &msg)) {
+					TranslateMessage(&msg);
+					DispatchMessage(&msg);
+				}
+			} else if(end_time == start_time || end_time <= timeGetTime()) {
+				break;
 			}
-			if(!TranslateAccelerator(hWnd, hAccel, &msg)) {
-				TranslateMessage(&msg);
-				DispatchMessage(&msg);
-			}
-		} else if(emu) {
+		}
+		if(emu) {
 			// drive machine
 			int run_frames = emu->run();
 			total_frames += run_frames;
@@ -428,6 +443,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 {
 	static HINSTANCE hInstance;
 	static HIMC himcPrev = 0;
+	static bool notified = false;
 	
 	switch(iMsg) {
 	case WM_CREATE:
@@ -440,28 +456,32 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 #ifdef SUPPORT_DRAG_DROP
 		DragAcceptFiles(hWnd, TRUE);
 #endif
+#ifdef _M_AMD64
+		// thanks Marukun (64bit)
+		hInstance = (HINSTANCE)GetWindowLongPtr(hWnd, GWLP_HINSTANCE);
+#else
 		hInstance = (HINSTANCE)GetWindowLong(hWnd, GWL_HINSTANCE);
+#endif
 		timeBeginPeriod(1);
 		break;
 	case WM_CLOSE:
 #ifdef USE_NOTIFY_POWER_OFF
 		// notify power off
-		if(emu) {
-			static bool notified = false;
-			if(!notified) {
-				emu->notify_power_off();
-				notified = true;
-				return 0;
-			}
+		if(emu && !notified) {
+			emu->notify_power_off();
+			notified = true;
+			return 0;
 		}
 #endif
 		// release window
 		if(now_fullscreen) {
 			ChangeDisplaySettings(NULL, 0);
+			now_fullscreen = false;
 		}
-		now_fullscreen = false;
-		if(hMenu != NULL && IsMenu(hMenu)) {
-			DestroyMenu(hMenu);
+		if(hMenu != NULL) {
+			if(IsMenu(hMenu)) {
+				DestroyMenu(hMenu);
+			}
 			hMenu = NULL;
 		}
 		if(hStatus != NULL) {
@@ -469,17 +489,28 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 			hStatus = NULL;
 		}
 		DestroyWindow(hWnd);
+		timeEndPeriod(1);
+	case WM_ENDSESSION:
 		// release emulation core
 		if(emu) {
 			delete emu;
 			emu = NULL;
+			save_config(create_local_path(_T("%s.ini"), _T(CONFIG_NAME)));
 		}
-		save_config(create_local_path(_T("%s.ini"), _T(CONFIG_NAME)));
-		timeEndPeriod(1);
 		return 0;
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		return 0;
+	case WM_QUERYENDSESSION:
+#ifdef USE_NOTIFY_POWER_OFF
+		// notify power off and drive machine
+		if(emu && !notified) {
+			emu->notify_power_off();
+			emu->run();
+			notified = true;
+		}
+#endif
+		return TRUE;
 	case WM_ACTIVATE:
 		// thanks PC8801MA‰ü
 		if(LOWORD(wParam) != WA_INACTIVE) {
@@ -544,26 +575,42 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 		if(emu) {
 			bool extended = ((HIWORD(lParam) & 0x100) != 0);
 			bool repeat = ((HIWORD(lParam) & 0x4000) != 0);
-			emu->key_down(LOBYTE(wParam), extended, repeat);
+			int code = LOBYTE(wParam);
+			if(code == VK_PROCESSKEY) {
+				code = MapVirtualKey(HIWORD(lParam) & 0xff, 3);
+			}
+			emu->key_down(code, extended, repeat);
 		}
 		break;
 	case WM_KEYUP:
 		if(emu) {
 			bool extended = ((HIWORD(lParam) & 0x100) != 0);
-			emu->key_up(LOBYTE(wParam), extended);
+			int code = LOBYTE(wParam);
+			if(code == VK_PROCESSKEY) {
+				code = MapVirtualKey(HIWORD(lParam) & 0xff, 3);
+			}
+			emu->key_up(code, extended);
 		}
 		break;
 	case WM_SYSKEYDOWN:
 		if(emu) {
 			bool extended = ((HIWORD(lParam) & 0x100) != 0);
 			bool repeat = ((HIWORD(lParam) & 0x4000) != 0);
-			emu->key_down(LOBYTE(wParam), extended, repeat);
+			int code = LOBYTE(wParam);
+			if(code == VK_PROCESSKEY) {
+				code = MapVirtualKey(HIWORD(lParam) & 0xff, 3);
+			}
+			emu->key_down(code, extended, repeat);
 		}
 		return 0;	// not activate menu when hit ALT/F10
 	case WM_SYSKEYUP:
 		if(emu) {
 			bool extended = ((HIWORD(lParam) & 0x100) != 0);
-			emu->key_up(LOBYTE(wParam), extended);
+			int code = LOBYTE(wParam);
+			if(code == VK_PROCESSKEY) {
+				code = MapVirtualKey(HIWORD(lParam) & 0xff, 3);
+			}
+			emu->key_up(code, extended);
 		}
 		return 0;	// not activate menu when hit ALT/F10
 	case WM_CHAR:
@@ -577,7 +624,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 		if(emu) {
 			emu->suspend();
 		}
-		update_menu(hWnd, (HMENU)wParam);
+		update_popup_menu(hWnd, (HMENU)wParam);
 		break;
 	case WM_ENTERMENULOOP:
 		now_menuloop = true;
@@ -626,12 +673,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 		case ID_RESET:
 			if(emu) {
 				emu->reset();
+				update_toplevel_menu(hWnd, hMenu);
 			}
 			break;
 #ifdef USE_SPECIAL_RESET
 		case ID_SPECIAL_RESET:
 			if(emu) {
 				emu->special_reset();
+				update_toplevel_menu(hWnd, hMenu);
 			}
 			break;
 #endif
@@ -643,6 +692,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 			break;
 		case ID_FULL_SPEED:
 			config.full_speed = !config.full_speed;
+			break;
+		case ID_DRIVE_VM_IN_OPECODE:
+			config.drive_vm_in_opecode = !config.drive_vm_in_opecode;
 			break;
 #ifdef USE_AUTO_KEY
 		case ID_AUTOKEY_START:
@@ -684,13 +736,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 		case ID_SAVE_STATE0: case ID_SAVE_STATE1: case ID_SAVE_STATE2: case ID_SAVE_STATE3: case ID_SAVE_STATE4:
 		case ID_SAVE_STATE5: case ID_SAVE_STATE6: case ID_SAVE_STATE7: case ID_SAVE_STATE8: case ID_SAVE_STATE9:
 			if(emu) {
-				emu->save_state(state_file_path(LOWORD(wParam) - ID_SAVE_STATE0));
+				emu->save_state(emu->state_file_path(LOWORD(wParam) - ID_SAVE_STATE0));
 			}
 			break;
 		case ID_LOAD_STATE0: case ID_LOAD_STATE1: case ID_LOAD_STATE2: case ID_LOAD_STATE3: case ID_LOAD_STATE4:
 		case ID_LOAD_STATE5: case ID_LOAD_STATE6: case ID_LOAD_STATE7: case ID_LOAD_STATE8: case ID_LOAD_STATE9:
 			if(emu) {
-				emu->load_state(state_file_path(LOWORD(wParam) - ID_LOAD_STATE0));
+				emu->load_state(emu->state_file_path(LOWORD(wParam) - ID_LOAD_STATE0));
 			}
 			break;
 #endif
@@ -726,6 +778,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 		case ID_VM_DIPSWITCH24: case ID_VM_DIPSWITCH25: case ID_VM_DIPSWITCH26: case ID_VM_DIPSWITCH27:
 		case ID_VM_DIPSWITCH28: case ID_VM_DIPSWITCH29: case ID_VM_DIPSWITCH30: case ID_VM_DIPSWITCH31:
 			config.dipswitch ^= (1 << (LOWORD(wParam) - ID_VM_DIPSWITCH0));
+			if(emu) {
+				emu->update_config();
+			}
 			break;
 #endif
 #ifdef USE_DEVICE_TYPE
@@ -794,8 +849,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 				emu->update_config();
 			}
 			break;
-		case ID_VM_SOUND_PLAY_TAPE:
-			config.sound_play_tape = !config.sound_play_tape;
+		case ID_VM_SOUND_TAPE_SIGNAL:
+			config.sound_tape_signal = !config.sound_tape_signal;
+			break;
+		case ID_VM_SOUND_TAPE_VOICE:
+			config.sound_tape_voice = !config.sound_tape_voice;
 			break;
 #endif
 #ifdef USE_MONITOR_TYPE
@@ -818,11 +876,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 				emu->update_config();
 			}
 			break;
+		case ID_VM_MONITOR_SCANLINE_AUTO:
+			config.scan_line_auto = !config.scan_line_auto;
+			break;
 #endif
 #ifdef USE_PRINTER_TYPE
 		case ID_VM_PRINTER_TYPE0: case ID_VM_PRINTER_TYPE1: case ID_VM_PRINTER_TYPE2: case ID_VM_PRINTER_TYPE3:
 		case ID_VM_PRINTER_TYPE4: case ID_VM_PRINTER_TYPE5: case ID_VM_PRINTER_TYPE6: case ID_VM_PRINTER_TYPE7:
 			config.printer_type = LOWORD(wParam) - ID_VM_PRINTER_TYPE0;
+			break;
+#endif
+#ifdef USE_SERIAL_TYPE
+		case ID_VM_SERIAL_TYPE0: case ID_VM_SERIAL_TYPE1: case ID_VM_SERIAL_TYPE2: case ID_VM_SERIAL_TYPE3:
+		case ID_VM_SERIAL_TYPE4: case ID_VM_SERIAL_TYPE5: case ID_VM_SERIAL_TYPE6: case ID_VM_SERIAL_TYPE7:
+			config.serial_type = LOWORD(wParam) - ID_VM_SERIAL_TYPE0;
 			break;
 #endif
 		case ID_HOST_REC_MOVIE_60FPS: case ID_HOST_REC_MOVIE_30FPS: case ID_HOST_REC_MOVIE_15FPS:
@@ -850,7 +917,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 				emu->capture_screen();
 			}
 			break;
+#ifdef SUPPORT_D2D1
+		case ID_HOST_USE_D2D1:
+			config.use_d2d1 = !config.use_d2d1;
+			#ifdef SUPPORT_D3D9
+				config.use_d3d9 = 0;
+			#endif
+			if(emu) {
+				emu->set_host_window_size(-1, -1, !now_fullscreen);
+			}
+			break;
+#endif
+#ifdef SUPPORT_D3D9
 		case ID_HOST_USE_D3D9:
+			#ifdef SUPPORT_D2D1
+				config.use_d2d1 = 0;
+			#endif
 			config.use_d3d9 = !config.use_d3d9;
 			if(emu) {
 				emu->set_host_window_size(-1, -1, !now_fullscreen);
@@ -862,6 +944,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 				emu->set_host_window_size(-1, -1, !now_fullscreen);
 			}
 			break;
+#endif
 		case ID_HOST_USE_DINPUT:
 			config.use_dinput = !config.use_dinput;
 			break;
@@ -874,6 +957,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 				if(!now_fullscreen) {
 					set_window(hWnd, prev_window_mode);
 				}
+				#ifdef SUPPORT_D2D1
+					emu->set_host_window_size(-1, -1, !now_fullscreen);
+				#endif
 			}
 			break;
 		case ID_SCREEN_WINDOW + 0: case ID_SCREEN_WINDOW + 1: case ID_SCREEN_WINDOW + 2: case ID_SCREEN_WINDOW + 3: case ID_SCREEN_WINDOW + 4:
@@ -960,21 +1046,24 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 			break;
 #ifdef USE_SOUND_VOLUME
 		case ID_SOUND_VOLUME:
-			DialogBoxParam((HINSTANCE)GetModuleHandle(0), MAKEINTRESOURCE(IDD_VOLUME), hWnd, VolumeWndProc, 0);
+			// thanks Marukun (64bit)
+			DialogBoxParam((HINSTANCE)GetModuleHandle(0), MAKEINTRESOURCE(IDD_VOLUME), hWnd, reinterpret_cast<DLGPROC>(VolumeWndProc), 0);
 			break;
 #endif
 #ifdef USE_JOYSTICK
 		case ID_INPUT_JOYSTICK0: case ID_INPUT_JOYSTICK1: case ID_INPUT_JOYSTICK2: case ID_INPUT_JOYSTICK3:
 		case ID_INPUT_JOYSTICK4: case ID_INPUT_JOYSTICK5: case ID_INPUT_JOYSTICK6: case ID_INPUT_JOYSTICK7:
 			{
+				// thanks Marukun (64bit)
 				LONG index = LOWORD(wParam) - ID_INPUT_JOYSTICK0;
-				DialogBoxParam((HINSTANCE)GetModuleHandle(0), MAKEINTRESOURCE(IDD_JOYSTICK), hWnd, JoyWndProc, (LPARAM)&index);
+				DialogBoxParam((HINSTANCE)GetModuleHandle(0), MAKEINTRESOURCE(IDD_JOYSTICK), hWnd, reinterpret_cast<DLGPROC>(JoyWndProc), (LPARAM)&index);
 			}
 			break;
 		case ID_INPUT_JOYTOKEY:
 			{
+				// thanks Marukun (64bit)
 				LONG index = 0;
-				DialogBoxParam((HINSTANCE)GetModuleHandle(0), MAKEINTRESOURCE(IDD_JOYTOKEY), hWnd, JoyToKeyWndProc, (LPARAM)&index);
+				DialogBoxParam((HINSTANCE)GetModuleHandle(0), MAKEINTRESOURCE(IDD_JOYTOKEY), hWnd, reinterpret_cast<DLGPROC>(JoyToKeyWndProc), (LPARAM)&index);
 			}
 			break;
 #endif
@@ -1041,7 +1130,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 			break; \
 		case ID_CLOSE_FD: \
 			if(emu) { \
-				close_floppy_disk(drv); \
+				emu->close_floppy_disk(drv); \
 			} \
 			break; \
 		case ID_OPEN_BLANK_2D_FD: \
@@ -1152,7 +1241,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 #endif
 #ifdef USE_HARD_DISK
 	#if USE_HARD_DISK >= 1
-		#define HD_MENU_ITEMS(drv, ID_OPEN_HD, ID_CLOSE_HD, ID_RECENT_HD) \
+		#define HD_MENU_ITEMS(drv, ID_OPEN_HD, ID_CLOSE_HD, ID_OPEN_BLANK_20MB_HD, ID_OPEN_BLANK_20MB_1024_HD, ID_OPEN_BLANK_40MB_HD, ID_RECENT_HD) \
 		case ID_OPEN_HD: \
 			if(emu) { \
 				open_hard_disk_dialog(hWnd, drv); \
@@ -1163,34 +1252,49 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 				emu->close_hard_disk(drv); \
 			} \
 			break; \
+		case ID_OPEN_BLANK_20MB_HD: \
+			if(emu) { \
+				open_blank_hard_disk_dialog(hWnd, drv, 256, 33, 4, 615); \
+			} \
+			break; \
+		case ID_OPEN_BLANK_20MB_1024_HD: \
+			if(emu) { \
+				open_blank_hard_disk_dialog(hWnd, drv, 1024, 8, 4, 615); \
+			} \
+			break; \
+		case ID_OPEN_BLANK_40MB_HD: \
+			if(emu) { \
+				open_blank_hard_disk_dialog(hWnd, drv, 256, 33, 8, 615); \
+			} \
+			break; \
 		case ID_RECENT_HD + 0: case ID_RECENT_HD + 1: case ID_RECENT_HD + 2: case ID_RECENT_HD + 3: \
 		case ID_RECENT_HD + 4: case ID_RECENT_HD + 5: case ID_RECENT_HD + 6: case ID_RECENT_HD + 7: \
 			if(emu) { \
 				open_recent_hard_disk(drv, LOWORD(wParam) - ID_RECENT_HD); \
 			} \
 			break;
-		HD_MENU_ITEMS(0, ID_OPEN_HD1, ID_CLOSE_HD1, ID_RECENT_HD1)
+		HD_MENU_ITEMS(0, ID_OPEN_HD1, ID_CLOSE_HD1, ID_OPEN_BLANK_20MB_HD1, ID_OPEN_BLANK_20MB_1024_HD1, ID_OPEN_BLANK_40MB_HD1, ID_RECENT_HD1)
 	#endif
 	#if USE_HARD_DISK >= 2
-		HD_MENU_ITEMS(1, ID_OPEN_HD2, ID_CLOSE_HD2, ID_RECENT_HD2)
+		HD_MENU_ITEMS(1, ID_OPEN_HD2, ID_CLOSE_HD2, ID_OPEN_BLANK_20MB_HD2, ID_OPEN_BLANK_20MB_1024_HD2, ID_OPEN_BLANK_40MB_HD2, ID_RECENT_HD2)
 	#endif
 	#if USE_HARD_DISK >= 3
-		HD_MENU_ITEMS(2, ID_OPEN_HD3, ID_CLOSE_HD3, ID_RECENT_HD3)
+		HD_MENU_ITEMS(2, ID_OPEN_HD3, ID_CLOSE_HD3, ID_OPEN_BLANK_20MB_HD3, ID_OPEN_BLANK_20MB_1024_HD3, ID_OPEN_BLANK_40MB_HD3, ID_RECENT_HD3)
 	#endif
 	#if USE_HARD_DISK >= 4
-		HD_MENU_ITEMS(3, ID_OPEN_HD4, ID_CLOSE_HD4, ID_RECENT_HD4)
+		HD_MENU_ITEMS(3, ID_OPEN_HD4, ID_CLOSE_HD4, ID_OPEN_BLANK_20MB_HD4, ID_OPEN_BLANK_20MB_1024_HD4, ID_OPEN_BLANK_40MB_HD4, ID_RECENT_HD4)
 	#endif
 	#if USE_HARD_DISK >= 5
-		HD_MENU_ITEMS(4, ID_OPEN_HD5, ID_CLOSE_HD5, ID_RECENT_HD5)
+		HD_MENU_ITEMS(4, ID_OPEN_HD5, ID_CLOSE_HD5, ID_OPEN_BLANK_20MB_HD5, ID_OPEN_BLANK_20MB_1024_HD5, ID_OPEN_BLANK_40MB_HD5, ID_RECENT_HD5)
 	#endif
 	#if USE_HARD_DISK >= 6
-		HD_MENU_ITEMS(5, ID_OPEN_HD6, ID_CLOSE_HD6, ID_RECENT_HD6)
+		HD_MENU_ITEMS(5, ID_OPEN_HD6, ID_CLOSE_HD6, ID_OPEN_BLANK_20MB_HD6, ID_OPEN_BLANK_20MB_1024_HD6, ID_OPEN_BLANK_40MB_HD6, ID_RECENT_HD6)
 	#endif
 	#if USE_HARD_DISK >= 7
-		HD_MENU_ITEMS(6, ID_OPEN_HD7, ID_CLOSE_HD7, ID_RECENT_HD7)
+		HD_MENU_ITEMS(6, ID_OPEN_HD7, ID_CLOSE_HD7, ID_OPEN_BLANK_20MB_HD7, ID_OPEN_BLANK_20MB_1024_HD7, ID_OPEN_BLANK_40MB_HD7, ID_RECENT_HD7)
 	#endif
 	#if USE_HARD_DISK >= 8
-		HD_MENU_ITEMS(7, ID_OPEN_HD8, ID_CLOSE_HD8, ID_RECENT_HD8)
+		HD_MENU_ITEMS(7, ID_OPEN_HD8, ID_CLOSE_HD8, ID_OPEN_BLANK_20MB_HD8, ID_OPEN_BLANK_20MB_1024_HD8, ID_OPEN_BLANK_40MB_HD8, ID_RECENT_HD8)
 	#endif
 #endif
 #ifdef USE_TAPE
@@ -1395,14 +1499,26 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 			break;
 #endif
 #ifdef ONE_BOARD_MICRO_COMPUTER
-		case ID_BUTTON +  0: case ID_BUTTON +  1: case ID_BUTTON +  2: case ID_BUTTON +  3:
-		case ID_BUTTON +  4: case ID_BUTTON +  5: case ID_BUTTON +  6: case ID_BUTTON +  7:
-		case ID_BUTTON +  8: case ID_BUTTON +  9: case ID_BUTTON + 10: case ID_BUTTON + 11:
-		case ID_BUTTON + 12: case ID_BUTTON + 13: case ID_BUTTON + 14: case ID_BUTTON + 15:
-		case ID_BUTTON + 16: case ID_BUTTON + 17: case ID_BUTTON + 18: case ID_BUTTON + 19:
-		case ID_BUTTON + 20: case ID_BUTTON + 21: case ID_BUTTON + 22: case ID_BUTTON + 23:
-		case ID_BUTTON + 24: case ID_BUTTON + 25: case ID_BUTTON + 26: case ID_BUTTON + 27:
-		case ID_BUTTON + 28: case ID_BUTTON + 29: case ID_BUTTON + 30: case ID_BUTTON + 31:
+		case ID_BUTTON +  0: case ID_BUTTON +  1: case ID_BUTTON +  2: case ID_BUTTON +  3: case ID_BUTTON +  4:
+		case ID_BUTTON +  5: case ID_BUTTON +  6: case ID_BUTTON +  7: case ID_BUTTON +  8: case ID_BUTTON +  9:
+		case ID_BUTTON + 10: case ID_BUTTON + 11: case ID_BUTTON + 12: case ID_BUTTON + 13: case ID_BUTTON + 14:
+		case ID_BUTTON + 15: case ID_BUTTON + 16: case ID_BUTTON + 17: case ID_BUTTON + 18: case ID_BUTTON + 19:
+		case ID_BUTTON + 20: case ID_BUTTON + 21: case ID_BUTTON + 22: case ID_BUTTON + 23: case ID_BUTTON + 24:
+		case ID_BUTTON + 25: case ID_BUTTON + 26: case ID_BUTTON + 27: case ID_BUTTON + 28: case ID_BUTTON + 29:
+		case ID_BUTTON + 30: case ID_BUTTON + 31: case ID_BUTTON + 32: case ID_BUTTON + 33: case ID_BUTTON + 34:
+		case ID_BUTTON + 35: case ID_BUTTON + 36: case ID_BUTTON + 37: case ID_BUTTON + 38: case ID_BUTTON + 39:
+		case ID_BUTTON + 40: case ID_BUTTON + 41: case ID_BUTTON + 42: case ID_BUTTON + 43: case ID_BUTTON + 44:
+		case ID_BUTTON + 45: case ID_BUTTON + 46: case ID_BUTTON + 47: case ID_BUTTON + 48: case ID_BUTTON + 49:
+		case ID_BUTTON + 50: case ID_BUTTON + 51: case ID_BUTTON + 52: case ID_BUTTON + 53: case ID_BUTTON + 54:
+		case ID_BUTTON + 55: case ID_BUTTON + 56: case ID_BUTTON + 57: case ID_BUTTON + 58: case ID_BUTTON + 59:
+		case ID_BUTTON + 60: case ID_BUTTON + 61: case ID_BUTTON + 62: case ID_BUTTON + 63: case ID_BUTTON + 64:
+		case ID_BUTTON + 65: case ID_BUTTON + 66: case ID_BUTTON + 67: case ID_BUTTON + 68: case ID_BUTTON + 69:
+		case ID_BUTTON + 70: case ID_BUTTON + 71: case ID_BUTTON + 72: case ID_BUTTON + 73: case ID_BUTTON + 74:
+		case ID_BUTTON + 75: case ID_BUTTON + 76: case ID_BUTTON + 77: case ID_BUTTON + 78: case ID_BUTTON + 79:
+		case ID_BUTTON + 80: case ID_BUTTON + 81: case ID_BUTTON + 82: case ID_BUTTON + 83: case ID_BUTTON + 84:
+		case ID_BUTTON + 85: case ID_BUTTON + 86: case ID_BUTTON + 87: case ID_BUTTON + 88: case ID_BUTTON + 89:
+		case ID_BUTTON + 90: case ID_BUTTON + 91: case ID_BUTTON + 92: case ID_BUTTON + 93: case ID_BUTTON + 94:
+		case ID_BUTTON + 95: case ID_BUTTON + 96: case ID_BUTTON + 97: case ID_BUTTON + 98: case ID_BUTTON + 99:
 			if(emu) {
 				emu->press_button(LOWORD(wParam) - ID_BUTTON);
 			}
@@ -1424,6 +1540,7 @@ void update_control_menu(HMENU hMenu)
 		CheckMenuRadioItem(hMenu, ID_CPU_POWER0, ID_CPU_POWER4, ID_CPU_POWER0 + config.cpu_power, MF_BYCOMMAND);
 	}
 	CheckMenuItem(hMenu, ID_FULL_SPEED, config.full_speed ? MF_CHECKED : MF_UNCHECKED);
+	CheckMenuItem(hMenu, ID_DRIVE_VM_IN_OPECODE, config.drive_vm_in_opecode ? MF_CHECKED : MF_UNCHECKED);
 #ifdef USE_AUTO_KEY
 	bool now_paste = true, now_stop = true;
 	if(emu) {
@@ -1459,7 +1576,7 @@ void update_save_state_menu(HMENU hMenu)
 	info.dwTypeData = buf;
 	
 	for(int i = 0; i < 10; i++) {
-		if((hFile = CreateFile(state_file_path(i), GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0)) != INVALID_HANDLE_VALUE){
+		if((hFile = CreateFile(emu->state_file_path(i), GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0)) != INVALID_HANDLE_VALUE){
 			GetFileTime(hFile, NULL, NULL, &ftWrite);
 			FileTimeToLocalFileTime(&ftWrite, &ftLocal);
 			FileTimeToSystemTime(&ftLocal, &st);
@@ -1494,7 +1611,7 @@ void update_load_state_menu(HMENU hMenu)
 	info.dwTypeData = buf;
 	
 	for(int i = 0; i < 10; i++) {
-		if((hFile = CreateFile(state_file_path(i), GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0)) != INVALID_HANDLE_VALUE){
+		if((hFile = CreateFile(emu->state_file_path(i), GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0)) != INVALID_HANDLE_VALUE){
 			GetFileTime(hFile, NULL, NULL, &ftWrite);
 			FileTimeToLocalFileTime(&ftWrite, &ftLocal);
 			FileTimeToSystemTime(&ftLocal, &st);
@@ -1809,7 +1926,8 @@ void update_vm_sound_menu(HMENU hMenu)
 #endif
 #ifdef USE_TAPE
 	CheckMenuItem(hMenu, ID_VM_SOUND_NOISE_CMT, config.sound_noise_cmt ? MF_CHECKED : MF_UNCHECKED);
-	CheckMenuItem(hMenu, ID_VM_SOUND_PLAY_TAPE, config.sound_play_tape ? MF_CHECKED : MF_UNCHECKED);
+	CheckMenuItem(hMenu, ID_VM_SOUND_TAPE_SIGNAL, config.sound_tape_signal ? MF_CHECKED : MF_UNCHECKED);
+	CheckMenuItem(hMenu, ID_VM_SOUND_TAPE_VOICE, config.sound_tape_voice ? MF_CHECKED : MF_UNCHECKED);
 #endif
 }
 #endif
@@ -1824,6 +1942,7 @@ void update_vm_monitor_menu(HMENU hMenu)
 #endif
 #ifdef USE_SCANLINE
 	CheckMenuItem(hMenu, ID_VM_MONITOR_SCANLINE, config.scan_line ? MF_CHECKED : MF_UNCHECKED);
+	CheckMenuItem(hMenu, ID_VM_MONITOR_SCANLINE_AUTO, config.scan_line_auto ? MF_CHECKED : MF_UNCHECKED);
 #endif
 }
 #endif
@@ -1833,6 +1952,15 @@ void update_vm_printer_menu(HMENU hMenu)
 {
 	if(config.printer_type >= 0 && config.printer_type < USE_PRINTER_TYPE) {
 		CheckMenuRadioItem(hMenu, ID_VM_PRINTER_TYPE0, ID_VM_PRINTER_TYPE0 + USE_PRINTER_TYPE - 1, ID_VM_PRINTER_TYPE0 + config.printer_type, MF_BYCOMMAND);
+	}
+}
+#endif
+
+#ifdef USE_SERIAL_TYPE
+void update_vm_serial_menu(HMENU hMenu)
+{
+	if(config.serial_type >= 0 && config.serial_type < USE_SERIAL_TYPE) {
+		CheckMenuRadioItem(hMenu, ID_VM_SERIAL_TYPE0, ID_VM_SERIAL_TYPE0 + USE_SERIAL_TYPE - 1, ID_VM_SERIAL_TYPE0 + config.serial_type, MF_BYCOMMAND);
 	}
 }
 #endif
@@ -1850,9 +1978,19 @@ void update_host_menu(HMENU hMenu)
 	EnableMenuItem(hMenu, ID_HOST_REC_SOUND, now_rec ? MF_GRAYED : MF_ENABLED);
 	EnableMenuItem(hMenu, ID_HOST_REC_STOP, now_stop ? MF_GRAYED : MF_ENABLED);
 	
+#ifdef SUPPORT_D2D1
+	CheckMenuItem(hMenu, ID_HOST_USE_D2D1, config.use_d2d1 ? MF_CHECKED : MF_UNCHECKED);
+#else
+	EnableMenuItem(hMenu, ID_HOST_USE_D2D1, MF_GRAYED);
+#endif
+#ifdef SUPPORT_D3D9
 	CheckMenuItem(hMenu, ID_HOST_USE_D3D9, config.use_d3d9 ? MF_CHECKED : MF_UNCHECKED);
 	CheckMenuItem(hMenu, ID_HOST_WAIT_VSYNC, config.wait_vsync ? MF_CHECKED : MF_UNCHECKED);
 	EnableMenuItem(hMenu, ID_HOST_WAIT_VSYNC, config.use_d3d9 ? MF_ENABLED : MF_GRAYED);
+#else
+	EnableMenuItem(hMenu, ID_HOST_USE_D3D9, MF_GRAYED);
+	EnableMenuItem(hMenu, ID_HOST_WAIT_VSYNC, MF_GRAYED);
+#endif
 	
 	CheckMenuItem(hMenu, ID_HOST_USE_DINPUT, config.use_dinput ? MF_CHECKED : MF_UNCHECKED);
 	
@@ -1989,7 +2127,83 @@ void update_host_capture_menu(HMENU hMenu)
 }
 #endif
 
-void update_menu(HWND hWnd, HMENU hMenu)
+void update_toplevel_menu(HWND hWnd, HMENU hMenu)
+{
+	int count = GetMenuItemCount(hMenu);
+	for(int pos = 0; pos < count; pos++) {
+		HMENU hMenuSub = GetSubMenu(hMenu, pos);
+		if(hMenuSub) {
+			int count_sub = GetMenuItemCount(hMenuSub);
+			UINT id = -1;
+			for(int pos_sub = 0; pos_sub < count_sub; pos_sub++) {
+				if((id = GetMenuItemID(hMenuSub, pos_sub)) != -1) {
+					break;
+				}
+			}
+			if(id >= ID_CONTROL_MENU_START && id <= ID_CONTROL_MENU_END) {
+				
+			}
+#ifdef USE_FLOPPY_DISK
+#if USE_FLOPPY_DISK >= 1
+			else if(id >= ID_FD1_MENU_START && id <= ID_FD1_MENU_END) {
+				EnableMenuItem(hMenu, pos, (emu->is_floppy_disk_connected(0) ? MF_ENABLED : MF_GRAYED) | MF_BYPOSITION);
+			}
+#endif
+#if USE_FLOPPY_DISK >= 2
+			else if(id >= ID_FD2_MENU_START && id <= ID_FD2_MENU_END) {
+				EnableMenuItem(hMenu, pos, (emu->is_floppy_disk_connected(1) ? MF_ENABLED : MF_GRAYED) | MF_BYPOSITION);
+			}
+#endif
+#if USE_FLOPPY_DISK >= 3
+			else if(id >= ID_FD3_MENU_START && id <= ID_FD3_MENU_END) {
+				EnableMenuItem(hMenu, pos, (emu->is_floppy_disk_connected(2) ? MF_ENABLED : MF_GRAYED) | MF_BYPOSITION);
+			}
+#endif
+#if USE_FLOPPY_DISK >= 4
+			else if(id >= ID_FD4_MENU_START && id <= ID_FD4_MENU_END) {
+				EnableMenuItem(hMenu, pos, (emu->is_floppy_disk_connected(3) ? MF_ENABLED : MF_GRAYED) | MF_BYPOSITION);
+			}
+#endif
+#if USE_FLOPPY_DISK >= 5
+			else if(id >= ID_FD5_MENU_START && id <= ID_FD5_MENU_END) {
+				EnableMenuItem(hMenu, pos, (emu->is_floppy_disk_connected(4) ? MF_ENABLED : MF_GRAYED) | MF_BYPOSITION);
+			}
+#endif
+#if USE_FLOPPY_DISK >= 6
+			else if(id >= ID_FD6_MENU_START && id <= ID_FD6_MENU_END) {
+				EnableMenuItem(hMenu, pos, (emu->is_floppy_disk_connected(5) ? MF_ENABLED : MF_GRAYED) | MF_BYPOSITION);
+			}
+#endif
+#if USE_FLOPPY_DISK >= 7
+			else if(id >= ID_FD7_MENU_START && id <= ID_FD7_MENU_END) {
+				EnableMenuItem(hMenu, pos, (emu->is_floppy_disk_connected(6) ? MF_ENABLED : MF_GRAYED) | MF_BYPOSITION);
+			}
+#endif
+#if USE_FLOPPY_DISK >= 8
+			else if(id >= ID_FD8_MENU_START && id <= ID_FD8_MENU_END) {
+				EnableMenuItem(hMenu, pos, (emu->is_floppy_disk_connected(7) ? MF_ENABLED : MF_GRAYED) | MF_BYPOSITION);
+			}
+#endif
+#endif
+#ifdef USE_QUICK_DISK
+#if USE_QUICK_DISK >= 1
+			else if(id >= ID_QD1_MENU_START && id <= ID_QD1_MENU_END) {
+				EnableMenuItem(hMenu, pos, (emu->is_quick_disk_connected(0) ? MF_ENABLED : MF_GRAYED) | MF_BYPOSITION);
+			}
+#endif
+#if USE_QUICK_DISK >= 2
+			else if(id >= ID_QD2_MENU_START && id <= ID_QD2_MENU_END) {
+				EnableMenuItem(hMenu, pos, (emu->is_quick_disk_connected(1) ? MF_ENABLED : MF_GRAYED) | MF_BYPOSITION);
+			}
+#endif
+#endif
+		}
+	}
+	// redraw menu bar
+	DrawMenuBar(hWnd);
+}
+
+void update_popup_menu(HWND hWnd, HMENU hMenu)
 {
 	int count = GetMenuItemCount(hMenu);
 	UINT id = -1;
@@ -2000,225 +2214,285 @@ void update_menu(HWND hWnd, HMENU hMenu)
 	}
 	if(id >= ID_CONTROL_MENU_START && id <= ID_CONTROL_MENU_END) {
 		update_control_menu(hMenu);
+	}
 #ifdef USE_STATE
-	} else if(id >= ID_SAVE_MENU_START && id <= ID_SAVE_MENU_END) {
+	else if(id >= ID_SAVE_MENU_START && id <= ID_SAVE_MENU_END) {
 		update_save_state_menu(hMenu);
-	} else if(id >= ID_LOAD_MENU_START && id <= ID_LOAD_MENU_END) {
+	}
+	else if(id >= ID_LOAD_MENU_START && id <= ID_LOAD_MENU_END) {
 		update_load_state_menu(hMenu);
+	}
 #endif
 #ifdef USE_CART
 #if USE_CART >= 1
-	} else if(id >= ID_CART1_MENU_START && id <= ID_CART1_MENU_END) {
+	else if(id >= ID_CART1_MENU_START && id <= ID_CART1_MENU_END) {
 		update_cart_menu(hMenu, 0, ID_RECENT_CART1, ID_CLOSE_CART1);
+	}
 #endif
 #if USE_CART >= 2
-	} else if(id >= ID_CART2_MENU_START && id <= ID_CART2_MENU_END) {
+	else if(id >= ID_CART2_MENU_START && id <= ID_CART2_MENU_END) {
 		update_cart_menu(hMenu, 1, ID_RECENT_CART2, ID_CLOSE_CART2);
+	}
 #endif
 #endif
 #ifdef USE_FLOPPY_DISK
 #if USE_FLOPPY_DISK >= 1
-	} else if(id >= ID_FD1_MENU_START && id <= ID_FD1_MENU_END) {
+	else if(id >= ID_FD1_MENU_START && id <= ID_FD1_MENU_END) {
 		update_floppy_disk_menu(hMenu, 0, ID_RECENT_FD1, ID_D88_FILE_PATH1, ID_SELECT_D88_BANK1, ID_EJECT_D88_BANK1, ID_CLOSE_FD1, ID_WRITE_PROTECT_FD1, ID_CORRECT_TIMING_FD1, ID_IGNORE_CRC_FD1);
+	}
 #endif
 #if USE_FLOPPY_DISK >= 2
-	} else if(id >= ID_FD2_MENU_START && id <= ID_FD2_MENU_END) {
+	else if(id >= ID_FD2_MENU_START && id <= ID_FD2_MENU_END) {
 		update_floppy_disk_menu(hMenu, 1, ID_RECENT_FD2, ID_D88_FILE_PATH2, ID_SELECT_D88_BANK2, ID_EJECT_D88_BANK2, ID_CLOSE_FD2, ID_WRITE_PROTECT_FD2, ID_CORRECT_TIMING_FD2, ID_IGNORE_CRC_FD2);
+	}
 #endif
 #if USE_FLOPPY_DISK >= 3
-	} else if(id >= ID_FD3_MENU_START && id <= ID_FD3_MENU_END) {
+	else if(id >= ID_FD3_MENU_START && id <= ID_FD3_MENU_END) {
 		update_floppy_disk_menu(hMenu, 2, ID_RECENT_FD3, ID_D88_FILE_PATH3, ID_SELECT_D88_BANK3, ID_EJECT_D88_BANK3, ID_CLOSE_FD3, ID_WRITE_PROTECT_FD3, ID_CORRECT_TIMING_FD3, ID_IGNORE_CRC_FD3);
+	}
 #endif
 #if USE_FLOPPY_DISK >= 4
-	} else if(id >= ID_FD4_MENU_START && id <= ID_FD4_MENU_END) {
+	else if(id >= ID_FD4_MENU_START && id <= ID_FD4_MENU_END) {
 		update_floppy_disk_menu(hMenu, 3, ID_RECENT_FD4, ID_D88_FILE_PATH4, ID_SELECT_D88_BANK4, ID_EJECT_D88_BANK4, ID_CLOSE_FD4, ID_WRITE_PROTECT_FD4, ID_CORRECT_TIMING_FD4, ID_IGNORE_CRC_FD4);
+	}
 #endif
 #if USE_FLOPPY_DISK >= 5
-	} else if(id >= ID_FD5_MENU_START && id <= ID_FD5_MENU_END) {
+	else if(id >= ID_FD5_MENU_START && id <= ID_FD5_MENU_END) {
 		update_floppy_disk_menu(hMenu, 4, ID_RECENT_FD5, ID_D88_FILE_PATH5, ID_SELECT_D88_BANK5, ID_EJECT_D88_BANK5, ID_CLOSE_FD5, ID_WRITE_PROTECT_FD5, ID_CORRECT_TIMING_FD5, ID_IGNORE_CRC_FD5);
+	}
 #endif
 #if USE_FLOPPY_DISK >= 6
-	} else if(id >= ID_FD6_MENU_START && id <= ID_FD6_MENU_END) {
+	else if(id >= ID_FD6_MENU_START && id <= ID_FD6_MENU_END) {
 		update_floppy_disk_menu(hMenu, 5, ID_RECENT_FD6, ID_D88_FILE_PATH6, ID_SELECT_D88_BANK6, ID_EJECT_D88_BANK6, ID_CLOSE_FD6, ID_WRITE_PROTECT_FD6, ID_CORRECT_TIMING_FD6, ID_IGNORE_CRC_FD6);
+	}
 #endif
 #if USE_FLOPPY_DISK >= 7
-	} else if(id >= ID_FD7_MENU_START && id <= ID_FD7_MENU_END) {
+	else if(id >= ID_FD7_MENU_START && id <= ID_FD7_MENU_END) {
 		update_floppy_disk_menu(hMenu, 6, ID_RECENT_FD7, ID_D88_FILE_PATH7, ID_SELECT_D88_BANK7, ID_EJECT_D88_BANK7, ID_CLOSE_FD7, ID_WRITE_PROTECT_FD7, ID_CORRECT_TIMING_FD7, ID_IGNORE_CRC_FD7);
+	}
 #endif
 #if USE_FLOPPY_DISK >= 8
-	} else if(id >= ID_FD8_MENU_START && id <= ID_FD8_MENU_END) {
+	else if(id >= ID_FD8_MENU_START && id <= ID_FD8_MENU_END) {
 		update_floppy_disk_menu(hMenu, 7, ID_RECENT_FD8, ID_D88_FILE_PATH8, ID_SELECT_D88_BANK8, ID_EJECT_D88_BANK8, ID_CLOSE_FD8, ID_WRITE_PROTECT_FD8, ID_CORRECT_TIMING_FD8, ID_IGNORE_CRC_FD8);
+	}
 #endif
 #endif
 #ifdef USE_QUICK_DISK
 #if USE_QUICK_DISK >= 1
-	} else if(id >= ID_QD1_MENU_START && id <= ID_QD1_MENU_END) {
+	else if(id >= ID_QD1_MENU_START && id <= ID_QD1_MENU_END) {
 		update_quick_disk_menu(hMenu, 0, ID_RECENT_QD1, ID_CLOSE_QD1);
+	}
 #endif
 #if USE_QUICK_DISK >= 2
-	} else if(id >= ID_QD2_MENU_START && id <= ID_QD2_MENU_END) {
+	else if(id >= ID_QD2_MENU_START && id <= ID_QD2_MENU_END) {
 		update_quick_disk_menu(hMenu, 1, ID_RECENT_QD2, ID_CLOSE_QD2);
+	}
 #endif
 #endif
 #ifdef USE_HARD_DISK
 #if USE_HARD_DISK >= 1
-	} else if(id >= ID_HD1_MENU_START && id <= ID_HD1_MENU_END) {
+	else if(id >= ID_HD1_MENU_START && id <= ID_HD1_MENU_END) {
 		update_hard_disk_menu(hMenu, 0, ID_RECENT_HD1, ID_CLOSE_HD1);
+	}
 #endif
 #if USE_HARD_DISK >= 2
-	} else if(id >= ID_HD2_MENU_START && id <= ID_HD2_MENU_END) {
+	else if(id >= ID_HD2_MENU_START && id <= ID_HD2_MENU_END) {
 		update_hard_disk_menu(hMenu, 1, ID_RECENT_HD2, ID_CLOSE_HD2);
+	}
 #endif
 #if USE_HARD_DISK >= 3
-	} else if(id >= ID_HD3_MENU_START && id <= ID_HD3_MENU_END) {
+	else if(id >= ID_HD3_MENU_START && id <= ID_HD3_MENU_END) {
 		update_hard_disk_menu(hMenu, 2, ID_RECENT_HD3, ID_CLOSE_HD3);
+	}
 #endif
 #if USE_HARD_DISK >= 4
-	} else if(id >= ID_HD4_MENU_START && id <= ID_HD4_MENU_END) {
+	else if(id >= ID_HD4_MENU_START && id <= ID_HD4_MENU_END) {
 		update_hard_disk_menu(hMenu, 3, ID_RECENT_HD4, ID_CLOSE_HD4);
+	}
 #endif
 #if USE_HARD_DISK >= 5
-	} else if(id >= ID_HD5_MENU_START && id <= ID_HD5_MENU_END) {
+	else if(id >= ID_HD5_MENU_START && id <= ID_HD5_MENU_END) {
 		update_hard_disk_menu(hMenu, 4, ID_RECENT_HD5, ID_CLOSE_HD5);
+	}
 #endif
 #if USE_HARD_DISK >= 6
-	} else if(id >= ID_HD6_MENU_START && id <= ID_HD6_MENU_END) {
+	else if(id >= ID_HD6_MENU_START && id <= ID_HD6_MENU_END) {
 		update_hard_disk_menu(hMenu, 5, ID_RECENT_HD6, ID_CLOSE_HD6);
+	}
 #endif
 #if USE_HARD_DISK >= 7
-	} else if(id >= ID_HD7_MENU_START && id <= ID_HD7_MENU_END) {
+	else if(id >= ID_HD7_MENU_START && id <= ID_HD7_MENU_END) {
 		update_hard_disk_menu(hMenu, 6, ID_RECENT_HD7, ID_CLOSE_HD7);
+	}
 #endif
 #if USE_HARD_DISK >= 8
-	} else if(id >= ID_HD8_MENU_START && id <= ID_HD8_MENU_END) {
+	else if(id >= ID_HD8_MENU_START && id <= ID_HD8_MENU_END) {
 		update_hard_disk_menu(hMenu, 7, ID_RECENT_HD8, ID_CLOSE_HD8);
+	}
 #endif
 #endif
 #ifdef USE_TAPE
 #if USE_TAPE >= 1
-	} else if(id >= ID_TAPE1_MENU_START && id <= ID_TAPE1_MENU_END) {
+	else if(id >= ID_TAPE1_MENU_START && id <= ID_TAPE1_MENU_END) {
 		update_tape_menu(hMenu, 0, ID_RECENT_TAPE1, ID_CLOSE_TAPE1, ID_PLAY_BUTTON1, ID_STOP_BUTTON1, ID_FAST_FORWARD1, ID_FAST_REWIND1, ID_APSS_FORWARD1, ID_APSS_REWIND1, ID_USE_WAVE_SHAPER1, ID_DIRECT_LOAD_MZT1, ID_TAPE_BAUD_LOW1, ID_TAPE_BAUD_HIGH1);
+	}
 #endif
 #if USE_TAPE >= 2
-	} else if(id >= ID_TAPE2_MENU_START && id <= ID_TAPE2_MENU_END) {
+	else if(id >= ID_TAPE2_MENU_START && id <= ID_TAPE2_MENU_END) {
 		update_tape_menu(hMenu, 1, ID_RECENT_TAPE2, ID_CLOSE_TAPE2, ID_PLAY_BUTTON2, ID_STOP_BUTTON2, ID_FAST_FORWARD2, ID_FAST_REWIND2, ID_APSS_FORWARD2, ID_APSS_REWIND2, ID_USE_WAVE_SHAPER2, ID_DIRECT_LOAD_MZT2, ID_TAPE_BAUD_LOW2, ID_TAPE_BAUD_HIGH2);
+	}
 #endif
 #endif
 #ifdef USE_COMPACT_DISC
 #if USE_COMPACT_DISC >= 1
-	} else if(id >= ID_COMPACT_DISC1_MENU_START && id <= ID_COMPACT_DISC1_MENU_END) {
+	else if(id >= ID_COMPACT_DISC1_MENU_START && id <= ID_COMPACT_DISC1_MENU_END) {
 		update_compact_disc_menu(hMenu, 0, ID_RECENT_COMPACT_DISC1, ID_CLOSE_COMPACT_DISC1);
+	}
 #endif
 #if USE_COMPACT_DISC >= 2
-	} else if(id >= ID_COMPACT_DISC2_MENU_START && id <= ID_COMPACT_DISC2_MENU_END) {
+	else if(id >= ID_COMPACT_DISC2_MENU_START && id <= ID_COMPACT_DISC2_MENU_END) {
 		update_compact_disc_menu(hMenu, 1, ID_RECENT_COMPACT_DISC2, ID_CLOSE_COMPACT_DISC2);
+	}
 #endif
 #endif
 #ifdef USE_LASER_DISC
 #if USE_LASER_DISC >= 1
-	} else if(id >= ID_LASER_DISC1_MENU_START && id <= ID_LASER_DISC1_MENU_END) {
+	else if(id >= ID_LASER_DISC1_MENU_START && id <= ID_LASER_DISC1_MENU_END) {
 		update_laser_disc_menu(hMenu, 0, ID_RECENT_LASER_DISC1, ID_CLOSE_LASER_DISC1);
+	}
 #endif
 #if USE_LASER_DISC >= 2
-	} else if(id >= ID_LASER_DISC2_MENU_START && id <= ID_LASER_DISC2_MENU_END) {
+	else if(id >= ID_LASER_DISC2_MENU_START && id <= ID_LASER_DISC2_MENU_END) {
 		update_laser_disc_menu(hMenu, 1, ID_RECENT_LASER_DISC2, ID_CLOSE_LASER_DISC2);
+	}
 #endif
 #endif
 #ifdef USE_BINARY_FILE
 #if USE_BINARY_FILE >= 1
-	} else if(id >= ID_BINARY1_MENU_START && id <= ID_BINARY1_MENU_END) {
+	else if(id >= ID_BINARY1_MENU_START && id <= ID_BINARY1_MENU_END) {
 		update_binary_menu(hMenu, 0, ID_RECENT_BINARY1);
+	}
 #endif
 #if USE_BINARY_FILE >= 2
-	} else if(id >= ID_BINARY2_MENU_START && id <= ID_BINARY2_MENU_END) {
+	else if(id >= ID_BINARY2_MENU_START && id <= ID_BINARY2_MENU_END) {
 		update_binary_menu(hMenu, 1, ID_RECENT_BINARY2);
+	}
 #endif
 #endif
 #ifdef USE_BUBBLE
 #if USE_BUBBLE >= 1
-	} else if(id >= ID_BUBBLE1_MENU_START && id <= ID_BUBBLE1_MENU_END) {
+	else if(id >= ID_BUBBLE1_MENU_START && id <= ID_BUBBLE1_MENU_END) {
 		update_bubble_casette_menu(hMenu, 0, ID_RECENT_BUBBLE1);
+	}
 #endif
 #if USE_BUBBLE >= 2
-	} else if(id >= ID_BUBBLE2_MENU_START && id <= ID_BUBBLE2_MENU_END) {
+	else if(id >= ID_BUBBLE2_MENU_START && id <= ID_BUBBLE2_MENU_END) {
 		update_bubble_casette_menu(hMenu, 1, ID_RECENT_BUBBLE2);
+	}
 #endif
 #endif
-#ifdef USE_BOOT_MODE
-	} else if(id >= ID_VM_BOOT_MENU_START && id <= ID_VM_BOOT_MENU_END) {
-		 update_vm_boot_menu(hMenu);
+#if defined(USE_BOOT_MODE) || defined(USE_DIPSWITCH)
+	else if(id >= ID_VM_BOOT_MENU_START && id <= ID_VM_BOOT_MENU_END) {
+		#ifdef USE_BOOT_MODE
+			update_vm_boot_menu(hMenu);
+		#endif
+		#ifdef USE_DIPSWITCH
+			// dipswitch may be in sound menu
+			update_vm_dipswitch_menu(hMenu);
+		#endif
+	}
 #endif
 #ifdef USE_CPU_TYPE
-	} else if(id >= ID_VM_CPU_MENU_START && id <= ID_VM_CPU_MENU_END) {
-		 update_vm_cpu_menu(hMenu);
+	else if(id >= ID_VM_CPU_MENU_START && id <= ID_VM_CPU_MENU_END) {
+		update_vm_cpu_menu(hMenu);
+	}
 #endif
 #ifdef USE_DIPSWITCH
-	} else if(id >= ID_VM_DIPSWITCH_MENU_START && id <= ID_VM_DIPSWITCH_MENU_END) {
-		 update_vm_dipswitch_menu(hMenu);
+	else if(id >= ID_VM_DIPSWITCH_MENU_START && id <= ID_VM_DIPSWITCH_MENU_END) {
+		update_vm_dipswitch_menu(hMenu);
+	}
 #endif
 #ifdef USE_DEVICE_TYPE
-	} else if(id >= ID_VM_DEVICE_MENU_START && id <= ID_VM_DEVICE_MENU_END) {
-		 update_vm_device_menu(hMenu);
+	else if(id >= ID_VM_DEVICE_MENU_START && id <= ID_VM_DEVICE_MENU_END) {
+		update_vm_device_menu(hMenu);
+	}
 #endif
 #ifdef USE_DRIVE_TYPE
-	} else if(id >= ID_VM_DRIVE_MENU_START && id <= ID_VM_DRIVE_MENU_END) {
-		 update_vm_drive_menu(hMenu);
+	else if(id >= ID_VM_DRIVE_MENU_START && id <= ID_VM_DRIVE_MENU_END) {
+		update_vm_drive_menu(hMenu);
+	}
 #endif
 #ifdef USE_KEYBOARD_TYPE
-	} else if(id >= ID_VM_KEYBOARD_MENU_START && id <= ID_VM_KEYBOARD_MENU_END) {
-		 update_vm_keyboard_menu(hMenu);
+	else if(id >= ID_VM_KEYBOARD_MENU_START && id <= ID_VM_KEYBOARD_MENU_END) {
+		update_vm_keyboard_menu(hMenu);
+	}
 #endif
 #ifdef USE_MOUSE_TYPE
-	} else if(id >= ID_VM_MOUSE_MENU_START && id <= ID_VM_MOUSE_MENU_END) {
-		 update_vm_mouse_menu(hMenu);
+	else if(id >= ID_VM_MOUSE_MENU_START && id <= ID_VM_MOUSE_MENU_END) {
+		update_vm_mouse_menu(hMenu);
+	}
 #endif
 #ifdef USE_JOYSTICK_TYPE
-	} else if(id >= ID_VM_JOYSTICK_MENU_START && id <= ID_VM_JOYSTICK_MENU_END) {
-		 update_vm_joystick_menu(hMenu);
+	else if(id >= ID_VM_JOYSTICK_MENU_START && id <= ID_VM_JOYSTICK_MENU_END) {
+		update_vm_joystick_menu(hMenu);
+	}
 #endif
 #if defined(USE_SOUND_TYPE) || defined(USE_FLOPPY_DISK) || defined(USE_TAPE) || defined(USE_DIPSWITCH)
-	} else if(id >= ID_VM_SOUND_MENU_START && id <= ID_VM_SOUND_MENU_END) {
-#if defined(USE_SOUND_TYPE) || defined(USE_FLOPPY_DISK) || defined(USE_TAPE)
-		update_vm_sound_menu(hMenu);
-#endif
-#ifdef USE_DIPSWITCH
-		// dipswitch may be in sound menu
-		 update_vm_dipswitch_menu(hMenu);
-#endif
+	else if(id >= ID_VM_SOUND_MENU_START && id <= ID_VM_SOUND_MENU_END) {
+		#if defined(USE_SOUND_TYPE) || defined(USE_FLOPPY_DISK) || defined(USE_TAPE)
+			update_vm_sound_menu(hMenu);
+		#endif
+		#ifdef USE_DIPSWITCH
+			// dipswitch may be in sound menu
+			update_vm_dipswitch_menu(hMenu);
+		#endif
+	}
 #endif
 #if defined(USE_MONITOR_TYPE) || defined(USE_SCANLINE) || defined(USE_DIPSWITCH)
-	} else if(id >= ID_VM_MONITOR_MENU_START && id <= ID_VM_MONITOR_MENU_END) {
-#if defined(USE_MONITOR_TYPE) || defined(USE_SCANLINE)
-		update_vm_monitor_menu(hMenu);
-#endif
-#ifdef USE_DIPSWITCH
-		// dipswitch may be in monitor menu
-		 update_vm_dipswitch_menu(hMenu);
-#endif
+	else if(id >= ID_VM_MONITOR_MENU_START && id <= ID_VM_MONITOR_MENU_END) {
+		#if defined(USE_MONITOR_TYPE) || defined(USE_SCANLINE)
+			update_vm_monitor_menu(hMenu);
+		#endif
+		#ifdef USE_DIPSWITCH
+			// dipswitch may be in monitor menu
+			update_vm_dipswitch_menu(hMenu);
+		#endif
+	}
 #endif
 #ifdef USE_PRINTER_TYPE
-	} else if(id >= ID_VM_PRINTER_MENU_START && id <= ID_VM_PRINTER_MENU_START) {
-		 update_vm_printer_menu(hMenu);
+	else if(id >= ID_VM_PRINTER_MENU_START && id <= ID_VM_PRINTER_MENU_END) {
+		update_vm_printer_menu(hMenu);
+	}
 #endif
-	} else if(id >= ID_HOST_MENU_START && id <= ID_HOST_MENU_END) {
+#ifdef USE_SERIAL_TYPE
+	else if(id >= ID_VM_SERIAL_MENU_START && id <= ID_VM_SERIAL_MENU_END) {
+		update_vm_serial_menu(hMenu);
+	}
+#endif
+	else if(id >= ID_HOST_MENU_START && id <= ID_HOST_MENU_END) {
 		update_host_menu(hMenu);
+	}
 #ifndef ONE_BOARD_MICRO_COMPUTER
-	} else if(id >= ID_SCREEN_MENU_START && id <= ID_SCREEN_MENU_END) {
+	else if(id >= ID_SCREEN_MENU_START && id <= ID_SCREEN_MENU_END) {
 		update_host_screen_menu(hMenu);
+	}
 #endif
 #ifdef USE_SCREEN_FILTER
-	} else if(id >= ID_FILTER_MENU_START && id <= ID_FILTER_MENU_END) {
+	else if(id >= ID_FILTER_MENU_START && id <= ID_FILTER_MENU_END) {
 		update_host_filter_menu(hMenu);
-#endif
-	} else if(id >= ID_SOUND_MENU_START && id <= ID_SOUND_MENU_END) {
-		update_host_sound_menu(hMenu);
-	} else if(id >= ID_INPUT_MENU_START && id <= ID_INPUT_MENU_END) {
-		update_host_input_menu(hMenu);
-#ifdef USE_VIDEO_CAPTURE
-	} else if(id >= ID_CAPTURE_MENU_START && id <= ID_CAPTURE_MENU_END) {
-		update_host_capture_menu(hMenu);
-#endif
 	}
+#endif
+	else if(id >= ID_SOUND_MENU_START && id <= ID_SOUND_MENU_END) {
+		update_host_sound_menu(hMenu);
+	}
+	else if(id >= ID_INPUT_MENU_START && id <= ID_INPUT_MENU_END) {
+		update_host_input_menu(hMenu);
+	}
+#ifdef USE_VIDEO_CAPTURE
+	else if(id >= ID_CAPTURE_MENU_START && id <= ID_CAPTURE_MENU_END) {
+		update_host_capture_menu(hMenu);
+	}
+#endif
 	DrawMenuBar(hWnd);
 }
 
@@ -2280,9 +2554,11 @@ bool get_status_bar_updated()
 	
 #ifdef USE_FLOPPY_DISK
 	uint32_t new_fd_status = emu->is_floppy_disk_accessed();
-	if(fd_status != new_fd_status) {
+	uint32_t new_fd_indicator_color = emu->floppy_disk_indicator_color();
+	if(fd_status != new_fd_status || fd_indicator_color != new_fd_indicator_color) {
 		updated = true;
 		fd_status = new_fd_status;
+		fd_indicator_color = new_fd_indicator_color;
 	}
 #endif
 #ifdef USE_QUICK_DISK
@@ -2340,18 +2616,19 @@ void update_status_bar(HINSTANCE hInstance, LPDRAWITEMSTRUCT lpDrawItem)
 	SetTextColor(lpDrawItem->hDC, RGB(0, 0, 0));
 	SetBkMode(lpDrawItem->hDC, TRANSPARENT);
 	
-	#if defined(USE_FLOPPY_DISK) || defined(USE_QUICK_DISK) || defined(USE_HARD_DISK) || defined(USE_COMPACT_DISC) || defined(USE_LASER_DISC)
+	#if defined(USE_FLOPPY_DISK) || defined(USE_QUICK_DISK) || defined(USE_HARD_DISK) || defined(USE_COMPACT_DISC) || defined(USE_LASER_DISC) || defined(USE_LED_DEVICE)
 	{
 		HDC hdcMem = CreateCompatibleDC(lpDrawItem->hDC);
-		HBITMAP hBitmap[2];
-		BITMAP bmp[2];
+		HBITMAP hBitmap[3];
+		BITMAP bmp[3];
 		hBitmap[0] = LoadBitmap(hInstance, _T("IDI_BITMAP_ACCESS_OFF"));
 		hBitmap[1] = LoadBitmap(hInstance, _T("IDI_BITMAP_ACCESS_ON" ));
+		hBitmap[2] = LoadBitmap(hInstance, _T("IDI_BITMAP_ACCESS_ON2"));
 		
-		if(hBitmap[0] != NULL && hBitmap[1] != NULL) {
-			GetObject(hBitmap[0], sizeof(BITMAP), &bmp[0]);
-			GetObject(hBitmap[1], sizeof(BITMAP), &bmp[1]);
-			
+		if(hBitmap[0] != NULL && hBitmap[1] != NULL && hBitmap[2] != NULL) {
+			for(int i = 0; i < 3; i++) {
+				GetObject(hBitmap[i], sizeof(BITMAP), &bmp[i]);
+			}
 			int bmp_width = bmp[0].bmWidth;
 			int bmp_height = bmp[0].bmHeight;
 			int bmp_top = (lpDrawItem->rcItem.top + lpDrawItem->rcItem.bottom) / 2 - bmp_height / 2;
@@ -2363,7 +2640,7 @@ void update_status_bar(HINSTANCE hInstance, LPDRAWITEMSTRUCT lpDrawItem)
 				draw_left += size.cx + 4;
 				
 				for(int i = 0; i < USE_FLOPPY_DISK; i++) {
-					int idx = (fd_status >> i) & 1;
+					int idx = !((fd_status >> i) & 1) ? 0 : !((fd_indicator_color >> i) & 1) ? 1 : 2;
 					SelectObject(hdcMem, hBitmap[idx]);
 					TransparentBlt(lpDrawItem->hDC, draw_left, bmp_top, bmp_width, bmp_height, hdcMem, 0, 0, bmp_width, bmp_height, 0);
 					draw_left += bmp_width + 2;
@@ -2422,12 +2699,24 @@ void update_status_bar(HINSTANCE hInstance, LPDRAWITEMSTRUCT lpDrawItem)
 				}
 				draw_left += 8;
 			#endif
+			#ifdef USE_LED_DEVICE
+				for(int i = 0; i < USE_LED_DEVICE; i++) {
+					TextOut(lpDrawItem->hDC, draw_left, text_top, led_device_caption[i], _tcslen(led_device_caption[i]));
+					GetTextExtentPoint32(lpDrawItem->hDC, led_device_caption[i], _tcslen(led_device_caption[i]), &size);
+					draw_left += size.cx + 4;
+					int idx = (emu->get_led_status() >> i) & 1;
+					SelectObject(hdcMem, hBitmap[idx]);
+					TransparentBlt(lpDrawItem->hDC, draw_left, bmp_top, bmp_width, bmp_height, hdcMem, 0, 0, bmp_width, bmp_height, 0);
+					draw_left += bmp_width + 2;
+					draw_left += 4;
+				}
+				draw_left += 4;
+			#endif
 		}
-		if(hBitmap[0] != NULL) {
-			DeleteObject(hBitmap[0]);
-		}
-		if(hBitmap[1] != NULL) {
-			DeleteObject(hBitmap[1]);
+		for(int i = 0; i < 3; i++) {
+			if(hBitmap[i] != NULL) {
+				DeleteObject(hBitmap[i]);
+			}
 		}
 		DeleteDC(hdcMem);
 	}
@@ -2439,7 +2728,7 @@ void update_status_bar(HINSTANCE hInstance, LPDRAWITEMSTRUCT lpDrawItem)
 		TextOut(lpDrawItem->hDC, draw_left, text_top, _T("CMT:"), 4);
 		GetTextExtentPoint32(lpDrawItem->hDC, _T("CMT:"), 4, &size);
 		draw_left += size.cx + 4;
-		TextOut(lpDrawItem->hDC, draw_left, text_top, tape_status, _tcslen(tape_status));
+		TextOut(lpDrawItem->hDC, draw_left, text_top, tape_status, (int)_tcslen(tape_status));
 	}
 	#endif
 }
@@ -2516,7 +2805,7 @@ void open_floppy_disk_dialog(HWND hWnd, int drv)
 {
 	_TCHAR* path = get_open_file_name(
 		hWnd,
-		_T("Supported Files (*.d88;*.d77;*.1dd;*.td0;*.imd;*.dsk;*.nfd;*.fdi;*.hdm;*.hd5;*.hd4;*.hdb;*.dd9;*.dd6;*.tfd;*.xdf;*.2d;*.sf7;*.img;*.ima;*.vfd)\0*.d88;*.d77;*.1dd;*.td0;*.imd;*.dsk;*.nfd;*.fdi;*.hdm;*.hd5;*.hd4;*.hdb;*.dd9;*.dd6;*.tfd;*.xdf;*.2d;*.sf7;*.img;*.ima;*.vfd\0All Files (*.*)\0*.*\0\0"),
+		_T("Supported Files (*.d88;*.d8e;*.d77;*.1dd;*.td0;*.imd;*.dsk;*.nfd;*.fdi;*.hdm;*.hd5;*.hd4;*.hdb;*.dd9;*.dd6;*.tfd;*.xdf;*.2d;*.sf7;*.img;*.ima;*.vfd)\0*.d88;*.d8e;*.d77;*.1dd;*.td0;*.imd;*.dsk;*.nfd;*.fdi;*.hdm;*.hd5;*.hd4;*.hdb;*.dd9;*.dd6;*.tfd;*.xdf;*.2d;*.sf7;*.img;*.ima;*.vfd\0All Files (*.*)\0*.*\0\0"),
 		_T("Floppy Disk"),
 		NULL,
 		config.initial_floppy_disk_dir, _MAX_PATH
@@ -2524,7 +2813,12 @@ void open_floppy_disk_dialog(HWND hWnd, int drv)
 	if(path) {
 		UPDATE_HISTORY(path, config.recent_floppy_disk_path[drv]);
 		my_tcscpy_s(config.initial_floppy_disk_dir, _MAX_PATH, get_parent_dir(path));
-		open_floppy_disk(drv, path, 0);
+		emu->open_floppy_disk(drv, path, 0);
+#if USE_FLOPPY_DISK >= 2
+		if((drv & 1) == 0 && drv + 1 < USE_FLOPPY_DISK && emu->d88_file[drv].bank_num > 1) {
+			emu->open_floppy_disk(drv + 1, path, 1);
+		}
+#endif
 	}
 }
 
@@ -2538,54 +2832,15 @@ void open_blank_floppy_disk_dialog(HWND hWnd, int drv, uint8_t type)
 		config.initial_floppy_disk_dir, _MAX_PATH
 	);
 	if(path) {
-		UPDATE_HISTORY(path, config.recent_floppy_disk_path[drv]);
-		my_tcscpy_s(config.initial_floppy_disk_dir, _MAX_PATH, get_parent_dir(path));
-		emu->create_bank_floppy_disk(path, type);
-		open_floppy_disk(drv, path, 0);
-	}
-}
-
-void open_floppy_disk(int drv, const _TCHAR* path, int bank)
-{
-	emu->d88_file[drv].bank_num = 0;
-	emu->d88_file[drv].cur_bank = -1;
-	
-	if(check_file_extension(path, _T(".d88")) || check_file_extension(path, _T(".d77")) || check_file_extension(path, _T(".1dd"))) {
-		FILEIO *fio = new FILEIO();
-		if(fio->Fopen(path, FILEIO_READ_BINARY)) {
-			try {
-				fio->Fseek(0, FILEIO_SEEK_END);
-				uint32_t file_size = fio->Ftell(), file_offset = 0;
-				while(file_offset + 0x2b0 <= file_size && emu->d88_file[drv].bank_num < MAX_D88_BANKS) {
-					fio->Fseek(file_offset, FILEIO_SEEK_SET);
-#ifdef _UNICODE
-					char tmp[18];
-					fio->Fread(tmp, 17, 1);
-					tmp[17] = 0;
-					MultiByteToWideChar(CP_ACP, 0, tmp, -1, emu->d88_file[drv].disk_name[emu->d88_file[drv].bank_num], 18);
-#else
-					fio->Fread(emu->d88_file[drv].disk_name[emu->d88_file[drv].bank_num], 17, 1);
-					emu->d88_file[drv].disk_name[emu->d88_file[drv].bank_num][17] = 0;
-#endif
-					fio->Fseek(file_offset + 0x1c, SEEK_SET);
-					file_offset += fio->FgetUint32_LE();
-					emu->d88_file[drv].bank_num++;
-				}
-				my_tcscpy_s(emu->d88_file[drv].path, _MAX_PATH, path);
-				emu->d88_file[drv].cur_bank = bank;
-			} catch(...) {
-				emu->d88_file[drv].bank_num = 0;
-			}
-			fio->Fclose();
+		if(!check_file_extension(path, _T(".d88")) && !check_file_extension(path, _T(".d77"))) {
+			my_tcscat_s(path, _MAX_PATH, _T(".d88"));
 		}
-		delete fio;
+		if(emu->create_blank_floppy_disk(path, type)) {
+			UPDATE_HISTORY(path, config.recent_floppy_disk_path[drv]);
+			my_tcscpy_s(config.initial_floppy_disk_dir, _MAX_PATH, get_parent_dir(path));
+			emu->open_floppy_disk(drv, path, 0);
+		}
 	}
-	emu->open_floppy_disk(drv, path, bank);
-#if USE_FLOPPY_DISK >= 2
-	if((drv & 1) == 0 && drv + 1 < USE_FLOPPY_DISK && bank + 1 < emu->d88_file[drv].bank_num) {
-		open_floppy_disk(drv + 1, path, bank + 1);
-	}
-#endif
 }
 
 void open_recent_floppy_disk(int drv, int index)
@@ -2596,23 +2851,19 @@ void open_recent_floppy_disk(int drv, int index)
 		my_tcscpy_s(config.recent_floppy_disk_path[drv][i], _MAX_PATH, config.recent_floppy_disk_path[drv][i - 1]);
 	}
 	my_tcscpy_s(config.recent_floppy_disk_path[drv][0], _MAX_PATH, path);
-	open_floppy_disk(drv, path, 0);
+	emu->open_floppy_disk(drv, path, 0);
+#if USE_FLOPPY_DISK >= 2
+	if((drv & 1) == 0 && drv + 1 < USE_FLOPPY_DISK && emu->d88_file[drv].bank_num > 1) {
+		emu->open_floppy_disk(drv + 1, path, 1);
+	}
+#endif
 }
 
 void select_d88_bank(int drv, int index)
 {
 	if(emu->d88_file[drv].cur_bank != index) {
 		emu->open_floppy_disk(drv, emu->d88_file[drv].path, index);
-		emu->d88_file[drv].cur_bank = index;
 	}
-}
-
-void close_floppy_disk(int drv)
-{
-	emu->close_floppy_disk(drv);
-	emu->d88_file[drv].bank_num = 0;
-	emu->d88_file[drv].cur_bank = -1;
-
 }
 #endif
 
@@ -2672,6 +2923,27 @@ void open_recent_hard_disk(int drv, int index)
 	my_tcscpy_s(config.recent_hard_disk_path[drv][0], _MAX_PATH, path);
 	emu->open_hard_disk(drv, path);
 }
+
+void open_blank_hard_disk_dialog(HWND hWnd, int drv, int sector_size, int sectors, int surfaces, int cylinders)
+{
+	_TCHAR* path = get_open_file_name(
+		hWnd,
+		_T("Supported Files (*.hdi;*.nhd)\0*.hdi;*.nhd\0All Files (*.*)\0*.*\0\0"),
+		_T("Hard Disk"),
+		create_date_file_name(_T("hdi")),
+		config.initial_hard_disk_dir, _MAX_PATH
+	);
+	if(path) {
+		if(!check_file_extension(path, _T(".hdi")) && !check_file_extension(path, _T(".nhd"))) {
+			my_tcscat_s(path, _MAX_PATH, _T(".hdi"));
+		}
+		if(emu->create_blank_hard_disk(path, sector_size, sectors, surfaces, cylinders)) {
+			UPDATE_HISTORY(path, config.recent_hard_disk_path[drv]);
+			my_tcscpy_s(config.initial_hard_disk_dir, _MAX_PATH, get_parent_dir(path));
+			emu->open_hard_disk(drv, path);
+		}
+	}
+}
 #endif
 
 #ifdef USE_TAPE
@@ -2690,6 +2962,9 @@ void open_tape_dialog(HWND hWnd, int drv, bool play)
 		     : _T("Supported Files (*.wav;*.cas)\0*.wav;*.cas\0All Files (*.*)\0*.*\0\0"),
 #elif defined(_MZ80B) || defined(_MZ2000) || defined(_MZ2200)
 		play ? _T("Supported Files (*.wav;*.cas;*.mzt;*.mzf;*.mti;*.mtw;*.dat;*.gz)\0*.wav;*.cas;*.mzt;*.mzf;*.mti;*.mtw;*.dat;*.gz\0All Files (*.*)\0*.*\0\0")
+		     : _T("Supported Files (*.wav;*.cas)\0*.wav;*.cas\0All Files (*.*)\0*.*\0\0"),
+#elif defined(_MZ2500)
+		play ? _T("Supported Files (*.wav;*.cas;*.mzt;*.mzf;*.mti;*.gz)\0*.wav;*.cas;*.mzt;*.mzf;*.mti;*.gz\0All Files (*.*)\0*.*\0\0")
 		     : _T("Supported Files (*.wav;*.cas)\0*.wav;*.cas\0All Files (*.*)\0*.*\0\0"),
 #elif defined(_X1) || defined(_X1TWIN) || defined(_X1TURBO) || defined(_X1TURBOZ)
 		play ? _T("Supported Files (*.wav;*.cas;*.tap;*.gz)\0*.wav;*.cas;*.tap;*.gz\0All Files (*.*)\0*.*\0\0")
@@ -2893,6 +3168,7 @@ void open_any_file(const _TCHAR* path)
 #endif
 #if defined(USE_FLOPPY_DISK)
 	if(check_file_extension(path, _T(".d88")) || 
+	   check_file_extension(path, _T(".d8e")) || 
 	   check_file_extension(path, _T(".d77")) || 
 	   check_file_extension(path, _T(".1dd")) || 
 	   check_file_extension(path, _T(".td0")) || 
@@ -2915,7 +3191,12 @@ void open_any_file(const _TCHAR* path)
 	   check_file_extension(path, _T(".vfd"))) {
 		UPDATE_HISTORY(path, config.recent_floppy_disk_path[0]);
 		my_tcscpy_s(config.initial_floppy_disk_dir, _MAX_PATH, get_parent_dir(path));
-		open_floppy_disk(0, path, 0);
+		emu->open_floppy_disk(0, path, 0);
+#if USE_FLOPPY_DISK >= 2
+		if(emu->d88_file[0].bank_num > 1) {
+			emu->open_floppy_disk(1, path, 1);
+		}
+#endif
 		return;
 	}
 #endif
@@ -3189,7 +3470,7 @@ void start_auto_key()
 		HANDLE hClip = GetClipboardData(CF_TEXT);
 		if(hClip) {
 			char* buf = (char*)GlobalLock(hClip);
-			int size = strlen(buf);
+			int size = (int)strlen(buf);
 			
 			if(size > 0) {
 				emu->stop_auto_key();
@@ -3208,7 +3489,7 @@ void start_auto_key()
 // ----------------------------------------------------------------------------
 
 #ifdef USE_SOUND_VOLUME
-BOOL CALLBACK VolumeWndProc(HWND hDlg, UINT iMsg, WPARAM wParam, LPARAM lParam)
+INT_PTR CALLBACK VolumeWndProc(HWND hDlg, UINT iMsg, WPARAM wParam, LPARAM lParam)
 {
 	switch(iMsg) {
 	case WM_CLOSE:
@@ -3232,8 +3513,8 @@ BOOL CALLBACK VolumeWndProc(HWND hDlg, UINT iMsg, WPARAM wParam, LPARAM lParam)
 		switch(LOWORD(wParam)) {
 		case IDOK:
 			for(int i = 0; i < USE_SOUND_VOLUME; i++) {
-				config.sound_volume_l[i] = SendDlgItemMessage(hDlg, IDC_VOLUME_PARAM_L0 + i, TBM_GETPOS, 0, 0);
-				config.sound_volume_r[i] = SendDlgItemMessage(hDlg, IDC_VOLUME_PARAM_R0 + i, TBM_GETPOS, 0, 0);
+				config.sound_volume_l[i] = (int)SendDlgItemMessage(hDlg, IDC_VOLUME_PARAM_L0 + i, TBM_GETPOS, 0, 0);
+				config.sound_volume_r[i] = (int)SendDlgItemMessage(hDlg, IDC_VOLUME_PARAM_R0 + i, TBM_GETPOS, 0, 0);
 				emu->set_sound_device_volume(i, config.sound_volume_l[i], config.sound_volume_r[i]);
 			}
 			EndDialog(hDlg, IDOK);
@@ -3493,7 +3774,7 @@ LRESULT CALLBACK JoySubProc(HWND hWnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 	return CallWindowProc(JoyOldProc[index], hWnd, iMsg, wParam, lParam);
 }
 
-BOOL CALLBACK JoyWndProc(HWND hDlg, UINT iMsg, WPARAM wParam, LPARAM lParam)
+INT_PTR CALLBACK JoyWndProc(HWND hDlg, UINT iMsg, WPARAM wParam, LPARAM lParam)
 {
 	switch(iMsg) {
 	case WM_CLOSE:
@@ -3513,8 +3794,14 @@ BOOL CALLBACK JoyWndProc(HWND hDlg, UINT iMsg, WPARAM wParam, LPARAM lParam)
 #endif
 				SetDlgItemText(hDlg, IDC_JOYSTICK_CAPTION0 + i, joy_button_names[i]);
 				set_joy_button_text(i);
+#ifdef _M_AMD64
+				// thanks Marukun (64bit)
+				JoyOldProc[i] = (WNDPROC)GetWindowLongPtr(hJoyEdit[i], GWLP_WNDPROC);
+				SetWindowLongPtr(hJoyEdit[i], GWLP_WNDPROC, (LONG_PTR)JoySubProc);
+#else
 				JoyOldProc[i] = (WNDPROC)GetWindowLong(hJoyEdit[i], GWL_WNDPROC);
 				SetWindowLong(hJoyEdit[i], GWL_WNDPROC, (LONG)JoySubProc);
+#endif
 			}
 		}
 		memset(joy_status, 0, sizeof(joy_status));
@@ -3557,12 +3844,12 @@ BOOL CALLBACK JoyWndProc(HWND hDlg, UINT iMsg, WPARAM wParam, LPARAM lParam)
 		}
 		break;
 	default:
-		return FALSE;
+		return (INT_PTR)FALSE;
 	}
-	return TRUE;
+	return (INT_PTR)TRUE;
 }
 
-BOOL CALLBACK JoyToKeyWndProc(HWND hDlg, UINT iMsg, WPARAM wParam, LPARAM lParam)
+INT_PTR CALLBACK JoyToKeyWndProc(HWND hDlg, UINT iMsg, WPARAM wParam, LPARAM lParam)
 {
 	switch(iMsg) {
 	case WM_CLOSE:
@@ -3581,8 +3868,14 @@ BOOL CALLBACK JoyToKeyWndProc(HWND hDlg, UINT iMsg, WPARAM wParam, LPARAM lParam
 			joy_button_params[i] = config.joy_to_key_buttons[i];
 			if((hJoyEdit[i] = GetDlgItem(hDlg, IDC_JOYSTICK_PARAM0 + i)) != NULL) {
 				set_joy_button_text(i);
+#ifdef _M_AMD64
+				// thanks Marukun (64bit)
+				JoyOldProc[i] = (WNDPROC)GetWindowLongPtr(hJoyEdit[i], GWLP_WNDPROC);
+				SetWindowLongPtr(hJoyEdit[i], GWLP_WNDPROC, (LONG_PTR)JoySubProc);
+#else
 				JoyOldProc[i] = (WNDPROC)GetWindowLong(hJoyEdit[i], GWL_WNDPROC);
 				SetWindowLong(hJoyEdit[i], GWL_WNDPROC, (LONG)JoySubProc);
+#endif
 			}
 		}
 		memset(joy_status, 0, sizeof(joy_status));
@@ -3617,7 +3910,7 @@ BOOL CALLBACK JoyToKeyWndProc(HWND hDlg, UINT iMsg, WPARAM wParam, LPARAM lParam
 			}
 			break;
 		default:
-			return FALSE;
+			return (INT_PTR)FALSE;
 		}
 		break;
 	case WM_TIMER:
@@ -3637,9 +3930,9 @@ BOOL CALLBACK JoyToKeyWndProc(HWND hDlg, UINT iMsg, WPARAM wParam, LPARAM lParam
 		}
 		break;
 	default:
-		return FALSE;
+		return (INT_PTR)FALSE;
 	}
-	return TRUE;
+	return (INT_PTR)TRUE;
 }
 #endif
 
@@ -3661,26 +3954,42 @@ LRESULT CALLBACK ButtonSubProc(HWND hWnd, UINT iMsg, WPARAM wParam, LPARAM lPara
 				if(emu) {
 					bool extended = ((HIWORD(lParam) & 0x100) != 0);
 					bool repeat = ((HIWORD(lParam) & 0x4000) != 0);
-					emu->key_down(LOBYTE(wParam), extended, repeat);
+					int code = LOBYTE(wParam);
+					if(code == VK_PROCESSKEY) {
+						code = MapVirtualKey(HIWORD(lParam) & 0xff, 3);
+					}
+					emu->key_down(code, extended, repeat);
 				}
 				break;
 			case WM_SYSKEYDOWN:
 				if(emu) {
 					bool extended = ((HIWORD(lParam) & 0x100) != 0);
 					bool repeat = ((HIWORD(lParam) & 0x4000) != 0);
-					emu->key_down(LOBYTE(wParam), extended, repeat);
+					int code = LOBYTE(wParam);
+					if(code == VK_PROCESSKEY) {
+						code = MapVirtualKey(HIWORD(lParam) & 0xff, 3);
+					}
+					emu->key_down(code, extended, repeat);
 				}
 				return 0;	// not activate menu when hit ALT/F10
 			case WM_KEYUP:
 				if(emu) {
 					bool extended = ((HIWORD(lParam) & 0x100) != 0);
-					emu->key_up(LOBYTE(wParam), extended);
+					int code = LOBYTE(wParam);
+					if(code == VK_PROCESSKEY) {
+						code = MapVirtualKey(HIWORD(lParam) & 0xff, 3);
+					}
+					emu->key_up(code, extended);
 				}
 				break;
 			case WM_SYSKEYUP:
 				if(emu) {
 					bool extended = ((HIWORD(lParam) & 0x100) != 0);
-					emu->key_up(LOBYTE(wParam), extended);
+					int code = LOBYTE(wParam);
+					if(code == VK_PROCESSKEY) {
+						code = MapVirtualKey(HIWORD(lParam) & 0xff, 3);
+					}
+					emu->key_up(code, extended);
 				}
 				return 0;	// not activate menu when hit ALT/F10
 			case WM_CHAR:
@@ -3703,8 +4012,13 @@ void create_buttons(HWND hWnd)
 		                          vm_buttons[i].x, vm_buttons[i].y,
 		                          vm_buttons[i].width, vm_buttons[i].height,
 		                          hWnd, (HMENU)(ID_BUTTON + i), (HINSTANCE)GetModuleHandle(0), NULL);
+#ifdef _M_AMD64
+		ButtonOldProc[i] = (WNDPROC)GetWindowLongPtr(hButton[i], GWLP_WNDPROC);
+		SetWindowLongPtr(hButton[i], GWLP_WNDPROC, (LONG_PTR)ButtonSubProc);
+#else
 		ButtonOldProc[i] = (WNDPROC)(LONG_PTR)GetWindowLong(hButton[i], GWL_WNDPROC);
 		SetWindowLong(hButton[i], GWL_WNDPROC, (LONG)(LONG_PTR)ButtonSubProc);
+#endif
 	}
 }
 

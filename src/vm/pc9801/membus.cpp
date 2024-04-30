@@ -85,9 +85,6 @@ void MEMBUS::initialize()
 	if(!read_bios(_T("IPL.ROM"), bios, sizeof(bios))) {
 		read_bios(_T("BIOS.ROM"), bios, sizeof(bios));
 	}
-#if defined(SUPPORT_BIOS_RAM)
-	memset(bios_ram, 0x00, sizeof(bios_ram));
-#endif
 #if defined(SUPPORT_ITF_ROM)
 	memset(itf, 0xff, sizeof(itf));
 	read_bios(_T("ITF.ROM"), itf, sizeof(itf));
@@ -97,11 +94,15 @@ void MEMBUS::initialize()
 	// EXT BIOS
 #if defined(_PC9801) || defined(_PC9801E)
 	memset(fd_bios_2hd, 0xff, sizeof(fd_bios_2hd));
-	read_bios(_T("2HDIF.ROM"), fd_bios_2hd, sizeof(fd_bios_2hd));
+	if(config.dipswitch & DIPSWITCH_2HD) {
+		read_bios(_T("2HDIF.ROM"), fd_bios_2hd, sizeof(fd_bios_2hd));
+	}
 	set_memory_r(0xd6000, 0xd6fff, fd_bios_2dd);
 	
 	memset(fd_bios_2dd, 0xff, sizeof(fd_bios_2dd));
-	read_bios(_T("2DDIF.ROM"), fd_bios_2dd, sizeof(fd_bios_2dd));
+	if(config.dipswitch & DIPSWITCH_2DD) {
+		read_bios(_T("2DDIF.ROM"), fd_bios_2dd, sizeof(fd_bios_2dd));
+	}
 	set_memory_r(0xd7000, 0xd7fff, fd_bios_2hd);
 #endif
 	memset(sound_bios, 0xff, sizeof(sound_bios));
@@ -114,7 +115,9 @@ void MEMBUS::initialize()
 		sound_bios_selected = (read_bios(_T("MUSIC.ROM"), sound_bios, sizeof(sound_bios)) != 0);
 	}
 	if(sound_bios_selected) {
-		d_display->sound_bios_ok();
+		d_display->set_memsw_4(d_display->get_memsw_4() |  8);
+	} else {
+		d_display->set_memsw_4(d_display->get_memsw_4() & ~8);
 	}
 	update_sound_bios();
 #if defined(SUPPORT_SASI_IF)
@@ -374,64 +377,152 @@ uint32_t MEMBUS::read_io8(uint32_t addr)
 	#define UPPER_MEMORY_32BIT	0xfffc0000
 #endif
 
-uint32_t MEMBUS::read_data8(uint32_t addr)
+inline bool MEMBUS::get_memory_addr(uint32_t *addr)
 {
-	if(addr < 0x80000) {
-		return MEMORY::read_data8(addr);
-	} else if(addr < 0xa0000) {
-		addr = (addr & 0x1ffff) | window_80000h;
-	} else if(addr < 0xc0000) {
-		addr = (addr & 0x1ffff) | window_a0000h;
-	}
-	if(addr < UPPER_MEMORY_24BIT) {
-		return MEMORY::read_data8(addr);
-#if defined(SUPPORT_24BIT_ADDRESS)
-	} else {
+	for(;;) {
+		if(*addr < 0x80000) {
+			return true;
+		}
+		if(*addr < 0xa0000) {
+			if((*addr = (*addr & 0x1ffff) | window_80000h) >= UPPER_MEMORY_24BIT) {
+				*addr &= 0xfffff;
+			}
+			return true;
+		}
+		if(*addr < 0xc0000) {
+			if((*addr = (*addr & 0x1ffff) | window_a0000h) >= UPPER_MEMORY_24BIT) {
+				*addr &= 0xfffff;
+			}
+			return true;
+		}
+		if(*addr < UPPER_MEMORY_24BIT) {
+			return true;
+		}
+#if defined(SUPPORT_32BIT_ADDRESS)
+		if(*addr < 0x1000000 || *addr >= UPPER_MEMORY_32BIT) {
+			*addr &= 0xfffff;
+		} else {
+			return false;
+		}
 #else
-	} else if(addr < 0x1000000 || addr >= UPPER_MEMORY_32BIT) {
+		*addr &= 0xfffff;
 #endif
-		return MEMORY::read_data8(addr & 0xfffff);
 	}
-	return 0xff;
+	return false;
 }
 
-void MEMBUS::write_data8(uint32_t addr, uint32_t data)
+// 4clk = wait when access memory on expansion board ???
+
+uint32_t MEMBUS::read_data8w(uint32_t addr, int *wait)
 {
-	if(addr < 0x80000) {
-		MEMORY::write_data8(addr, data);
+	if(!get_memory_addr(&addr)) {
+		*wait = 4;
+		return 0xff;
+	}
+	return MEMORY::read_data8w(addr, wait);
+}
+
+void MEMBUS::write_data8w(uint32_t addr, uint32_t data, int *wait)
+{
+	if(!get_memory_addr(&addr)) {
+		*wait = 4;
 		return;
-	} else if(addr < 0xa0000) {
-		addr = (addr & 0x1ffff) | window_80000h;
-	} else if(addr < 0xc0000) {
-		addr = (addr & 0x1ffff) | window_a0000h;
 	}
-	if(addr < UPPER_MEMORY_24BIT) {
-		MEMORY::write_data8(addr, data);
-#if defined(SUPPORT_24BIT_ADDRESS)
+	MEMORY::write_data8w(addr, data, wait);
+}
+
+uint32_t MEMBUS::read_data16w(uint32_t addr, int *wait)
+{
+	if(!get_memory_addr(&addr)) {
+		*wait = 4 * bus_access_times_16(addr);
+		return 0xffff;
+	}
+	return MEMORY::read_data16w(addr, wait);
+}
+
+void MEMBUS::write_data16w(uint32_t addr, uint32_t data, int *wait)
+{
+	if(!get_memory_addr(&addr)) {
+		*wait = 4 * bus_access_times_16(addr);
+		return;
+	}
+	MEMORY::write_data16w(addr, data, wait);
+}
+
+uint32_t MEMBUS::read_data32w(uint32_t addr, int *wait)
+{
+	if(!get_memory_addr(&addr)) {
+		*wait = 4 * bus_access_times_32(addr);
+		return 0xffffffff;
+	}
+	return MEMORY::read_data32w(addr, wait);
+}
+
+void MEMBUS::write_data32w(uint32_t addr, uint32_t data, int *wait)
+{
+	if(!get_memory_addr(&addr)) {
+		*wait = 4 * bus_access_times_32(addr);
+		return;
+	}
+	MEMORY::write_data32w(addr, data, wait);
+}
+#endif
+
+uint32_t MEMBUS::read_dma_data8w(uint32_t addr, int *wait)
+{
+#if defined(SUPPORT_24BIT_ADDRESS) || defined(SUPPORT_32BIT_ADDRESS)
+	if(dma_access_ctrl & 4) {
+		addr &= 0x000fffff;
+	}
+#endif
+	return MEMBUS::read_data8w(addr, wait);
+}
+
+void MEMBUS::write_dma_data8w(uint32_t addr, uint32_t data, int *wait)
+{
+#if defined(SUPPORT_24BIT_ADDRESS) || defined(SUPPORT_32BIT_ADDRESS)
+	if(dma_access_ctrl & 4) {
+		addr &= 0x000fffff;
+	}
+#endif
+	MEMBUS::write_data8w(addr, data, wait);
+}
+
+uint32_t MEMBUS::read_dma_data16w(uint32_t addr, int *wait)
+{
+	if(!(addr & 1)) {
+#if defined(SUPPORT_24BIT_ADDRESS) || defined(SUPPORT_32BIT_ADDRESS)
+		if(dma_access_ctrl & 4) {
+			addr &= 0x000fffff;
+		}
+#endif
+		return MEMBUS::read_data16w(addr, wait);
 	} else {
-#else
-	} else if(addr < 0x1000000 || addr >= UPPER_MEMORY_32BIT) {
-#endif
-		MEMORY::write_data8(addr & 0xfffff, data);
+		int wait_l = 0, wait_h = 0;
+		uint32_t val;
+		val  = read_dma_data8w(addr    , &wait_l);
+		val |= read_dma_data8w(addr + 1, &wait_h) << 8;
+		*wait = wait_l + wait_h;
+		return val;
 	}
 }
 
-uint32_t MEMBUS::read_dma_data8(uint32_t addr)
+void MEMBUS::write_dma_data16w(uint32_t addr, uint32_t data, int *wait)
 {
-	if(dma_access_ctrl & 4) {
-		addr &= 0x000fffff;
-	}
-	return MEMBUS::read_data8(addr);
-}
-
-void MEMBUS::write_dma_data8(uint32_t addr, uint32_t data)
-{
-	if(dma_access_ctrl & 4) {
-		addr &= 0x000fffff;
-	}
-	MEMBUS::write_data8(addr, data);
-}
+	if(!(addr & 1)) {
+#if defined(SUPPORT_24BIT_ADDRESS) || defined(SUPPORT_32BIT_ADDRESS)
+		if(dma_access_ctrl & 4) {
+			addr &= 0x000fffff;
+		}
 #endif
+		MEMBUS::write_data16w(addr, data, wait);
+	} else {
+		int wait_l = 0, wait_h = 0;
+		write_dma_data8w(addr    , (data     ) & 0xff, &wait_l);
+		write_dma_data8w(addr + 1, (data >> 8) & 0xff, &wait_h);
+		*wait = wait_l + wait_h;
+	}
+}
 
 void MEMBUS::update_bios()
 {
@@ -439,16 +530,18 @@ void MEMBUS::update_bios()
 #if defined(SUPPORT_ITF_ROM)
 	if(itf_selected) {
 		set_memory_r(0x100000 - sizeof(itf), 0xfffff, itf);
+//		unset_memory_w(0x100000 - sizeof(itf), 0xfffff);
 	} else {
 #endif
 #if defined(SUPPORT_BIOS_RAM)
 		if(bios_ram_selected) {
-			set_memory_rw(0x100000 - sizeof(bios_ram), 0xfffff, bios_ram);
+			set_memory_rw(0x100000 - sizeof(bios), 0xfffff, ram + 0x100000 - sizeof(bios));
 		} else {
 #endif
 			set_memory_r(0x100000 - sizeof(bios), 0xfffff, bios);
+//			unset_memory_w(0x100000 - sizeof(bios), 0xfffff);
 #if defined(SUPPORT_BIOS_RAM)
-//			set_memory_w(0x100000 - sizeof(bios_ram), 0xfffff, bios_ram);
+			set_memory_w(0x100000 - sizeof(bios), 0xfffff, ram + 0x100000 - sizeof(bios));
 		}
 #endif
 #if defined(SUPPORT_ITF_ROM)
@@ -460,8 +553,8 @@ void MEMBUS::update_bios()
 void MEMBUS::update_sound_bios()
 {
 	if(sound_bios_selected) {
-//		if(sound_bios_selected) {
-//			set_memory_r(0xcc000, 0xcffff, sound_bios_ram);
+//		if(sound_bios_ram_selected) {
+//			set_memory_rw(0xcc000, 0xcffff, sound_bios_ram);
 //		} else {
 			set_memory_r(0xcc000, 0xcffff, sound_bios);
 			unset_memory_w(0xcc000, 0xcffff);
@@ -533,7 +626,7 @@ void MEMBUS::update_nec_ems()
 #endif
 #endif
 
-#define STATE_VERSION	4
+#define STATE_VERSION	5
 
 bool MEMBUS::process_state(FILEIO* state_fio, bool loading)
 {
@@ -545,7 +638,6 @@ bool MEMBUS::process_state(FILEIO* state_fio, bool loading)
 	}
 	state_fio->StateArray(ram, sizeof(ram), 1);
 #if defined(SUPPORT_BIOS_RAM)
-	state_fio->StateArray(bios_ram, sizeof(bios_ram), 1);
 	state_fio->StateValue(bios_ram_selected);
 #endif
 #if defined(SUPPORT_ITF_ROM)

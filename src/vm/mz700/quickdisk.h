@@ -25,10 +25,13 @@
 
 #define QUICKDISK_BUFFER_SIZE	65536
 
+class NOISE;
+
 class QUICKDISK : public DEVICE
 {
 private:
 	DEVICE *d_sio;
+	NOISE* d_noise_seek;
 	
 	_TCHAR file_path[_MAX_PATH];
 	bool insert, protect, home;
@@ -52,6 +55,7 @@ private:
 	void set_protect(bool val);
 	void set_home(bool val);
 	void release_disk();
+	unsigned short calc_crc(int* buff, int size);
 	
 public:
 	QUICKDISK(VM_TEMPLATE* parent_vm, EMU* parent_emu) : DEVICE(parent_vm, parent_emu)
@@ -67,12 +71,21 @@ public:
 	void write_signal(int id, uint32_t data, uint32_t mask);
 	uint32_t read_signal(int ch);
 	void event_callback(int event_id, int err);
+	void update_config();
 	bool process_state(FILEIO* state_fio, bool loading);
 	
 	// unique functions
 	void set_context_sio(DEVICE* device)
 	{
 		d_sio = device;
+	}
+	void set_context_noise_seek(NOISE* device)
+	{
+		d_noise_seek = device;
+	}
+	NOISE* get_context_noise_seek()
+	{
+		return d_noise_seek;
 	}
 	void open_disk(const _TCHAR* path);
 	void close_disk();

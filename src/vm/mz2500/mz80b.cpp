@@ -45,7 +45,7 @@
 #endif
 
 #ifdef SUPPORT_16BIT_BOARD
-#include "../i286.h"
+#include "../i86.h"
 #include "../i8259.h"
 #include "mz1m01.h"
 #endif
@@ -68,6 +68,7 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	pit = new I8253(this, emu);
 	pio_i = new I8255(this, emu);
 	io = new IO(this, emu);
+	io->space = 0x100;
 	fdc = new MB8877(this, emu);
 	fdc->set_context_noise_seek(new NOISE(this, emu));
 	fdc->set_context_noise_head_down(new NOISE(this, emu));
@@ -88,11 +89,13 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 #ifdef SUPPORT_QUICK_DISK
 	sio = new Z80SIO(this, emu);
 	qd = new QUICKDISK(this, emu);
+	qd->set_context_noise_seek(new NOISE(this, emu));
 #endif
 	
 #ifdef SUPPORT_16BIT_BOARD
 	pio_to16 = new Z80PIO(this, emu);
-	cpu_16 = new I286(this, emu);	// 8088
+	cpu_16 = new I86(this, emu);
+	cpu_16->device_model = INTEL_8088;
 	pic_16 = new I8259(this, emu);
 	mz1m01 = new MZ1M01(this, emu);
 #endif
@@ -110,6 +113,9 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	event->set_context_sound(drec->get_context_noise_play());
 	event->set_context_sound(drec->get_context_noise_stop());
 	event->set_context_sound(drec->get_context_noise_fast());
+#ifdef SUPPORT_QUICK_DISK
+	event->set_context_sound(qd->get_context_noise_seek());
+#endif
 	
 	drec->set_context_ear(cmt, SIG_CMT_OUT, 1);
 	drec->set_context_remote(cmt, SIG_CMT_REMOTE, 1);
@@ -229,7 +235,7 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	io->set_iomap_range_w(0xb4, 0xb4, memory);
 #endif
 	io->set_iomap_range_rw(0xd8, 0xdb, fdc);
-	io->set_iomap_range_w(0xdc, 0xdd, floppy);
+	io->set_iomap_range_w(0xdc, 0xde, floppy);
 	io->set_iomap_range_rw(0xe0, 0xe3, pio_i);
 	io->set_iomap_range_rw(0xe4, 0xe7, pit);
 	io->set_iomap_range_rw(0xe8, 0xeb, pio);
@@ -294,7 +300,7 @@ void VM::special_reset()
 //		device->special_reset();
 //	}
 	memory->special_reset();
-	cpu->reset();
+	cpu->special_reset();
 #ifdef SUPPORT_16BIT_BOARD
 	pio_to16->reset();
 	cpu_16->reset();
@@ -373,6 +379,10 @@ void VM::set_sound_device_volume(int ch, int decibel_l, int decibel_r)
 		drec->get_context_noise_play()->set_volume(0, decibel_l, decibel_r);
 		drec->get_context_noise_stop()->set_volume(0, decibel_l, decibel_r);
 		drec->get_context_noise_fast()->set_volume(0, decibel_l, decibel_r);
+#ifdef SUPPORT_QUICK_DISK
+	} else if(ch == 4) {
+		qd->get_context_noise_seek()->set_volume(0, decibel_l, decibel_r);
+#endif
 	}
 }
 #endif
@@ -559,7 +569,7 @@ void VM::update_config()
 	}
 }
 
-#define STATE_VERSION	4
+#define STATE_VERSION	6
 
 bool VM::process_state(FILEIO* state_fio, bool loading)
 {
@@ -567,8 +577,8 @@ bool VM::process_state(FILEIO* state_fio, bool loading)
 		return false;
 	}
 	for(DEVICE* device = first_device; device; device = device->next_device) {
-		const char *name = typeid(*device).name() + 6; // skip "class "
-		int len = strlen(name);
+		const _TCHAR *name = char_to_tchar(typeid(*device).name() + 6); // skip "class "
+		int len = (int)_tcslen(name);
 		
 		if(!state_fio->StateCheckInt32(len)) {
 			return false;

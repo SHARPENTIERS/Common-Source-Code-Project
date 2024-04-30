@@ -291,7 +291,6 @@
 #define HAS_MC6809              
 #define MB8877_MAX_CHIPS	1
 #define MB8877_DELAY_AFTER_SEEK	60000
-//#define IO_ADDR_MAX		0x10000
 
 // device informations for win32
 #if defined(HAS_2HD)
@@ -381,6 +380,13 @@ static const _TCHAR *joy_button_captions[] = {
 	_T("Button #2(1st)"),
 	_T("Button #1(2nd)"),
 	_T("Button #2(2nd)"),
+};
+#endif
+#ifdef USE_LED_DEVICE
+static const _TCHAR *led_device_caption[] = {
+	_T("INS:"),
+	_T("KANA:"),
+	_T("CAP:"),
 };
 #endif
 

@@ -46,7 +46,7 @@ public:
 	
 //	int cylinders;
 	int surfaces;
-//	int sectors;
+	int sectors;
 	int sector_size;
 	int sector_num;
 	int drive_num;

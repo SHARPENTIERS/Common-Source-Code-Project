@@ -51,6 +51,7 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	pio_f = new I8255(this, emu);
 	pio_f->set_device_name(_T("8255 PIO (Floppy I/F)"));
 	io = new IO(this, emu);
+	io->space = 0x100;
 	psg = new SN76489AN(this, emu);
 	vdp = new TMS9918A(this, emu);
 #ifdef USE_DEBUGGER
@@ -377,8 +378,8 @@ bool VM::process_state(FILEIO* state_fio, bool loading)
 		return false;
 	}
 	for(DEVICE* device = first_device; device; device = device->next_device) {
-		const char *name = typeid(*device).name() + 6; // skip "class "
-		int len = strlen(name);
+		const _TCHAR *name = char_to_tchar(typeid(*device).name() + 6); // skip "class "
+		int len = (int)_tcslen(name);
 		
 		if(!state_fio->StateCheckInt32(len)) {
 			return false;

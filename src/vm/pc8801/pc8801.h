@@ -64,43 +64,63 @@
 	#define SUPPORT_PC88_OPN1
 	#define SUPPORT_PC88_OPN2
 	#define SUPPORT_PC88_OPNA
+	#define SUPPORT_PC88_FDD_8INCH
 	#define SUPPORT_PC88_CDROM
 	#define SUPPORT_PC88_VAB
 	#define SUPPORT_PC88_HMB20
+	#define SUPPORT_PC88_JAST
 	#define SUPPORT_PC88_JOYSTICK
 	#if defined(SUPPORT_PC88_VAB)
 		// X88000
-		#define PC88_EXRAM_BANKS	8
-		#define PC88_VAB_PAGE		1
+//		#define PC88_EXRAM_BANKS	8
+//		#define PC88_VAB_PAGE		1
+		#define PC88_EXRAM_BANKS	4
+		#define PC88_VAB_PAGE		0
 	#else
 		#define PC88_EXRAM_BANKS	4
 	#endif
 	#define HAS_UPD4990A
+	#define SUPPORT_M88_DISKDRV
 #elif defined(_PC8801MK2)
 	#define SUPPORT_PC88_KANJI1
 //	#define SUPPORT_PC88_KANJI2
 	#define SUPPORT_PC88_OPN2
+	#define SUPPORT_PC88_JAST
+	#define SUPPORT_PC88_FDD_8INCH
+	#define SUPPORT_PC88_16BIT
+	#define SUPPORT_M88_DISKDRV
 #elif defined(_PC8801)
 	#define SUPPORT_PC88_KANJI1
 //	#define SUPPORT_PC88_KANJI2
 	#define SUPPORT_PC88_OPN2
+	#define SUPPORT_PC88_JAST
+	#define SUPPORT_PC88_FDD_8INCH
+	#define SUPPORT_PC88_16BIT
+	#define SUPPORT_M88_DISKDRV
 #elif defined(_PC8001SR)
 	#define SUPPORT_PC88_KANJI1
 //	#define SUPPORT_PC88_KANJI2
 	#define SUPPORT_PC88_OPN1
 	#define SUPPORT_PC88_OPN2
 	#define PC88_EXRAM_BANKS	1
+	#define SUPPORT_PC88_FDD_8INCH
+	#define SUPPORT_M88_DISKDRV
 #elif defined(_PC8001MK2)
 	#define SUPPORT_PC88_KANJI1
 //	#define SUPPORT_PC88_KANJI2
 	#define SUPPORT_PC88_OPN2
 	#define PC88_EXRAM_BANKS	1
+	#define SUPPORT_PC88_FDD_8INCH
+	#define SUPPORT_M88_DISKDRV
 #elif defined(_PC8001)
 //	#define SUPPORT_PC88_KANJI1
 //	#define SUPPORT_PC88_KANJI2
+//	#define SUPPORT_PC88_FDD_8INCH
+//	#define SUPPORT_M88_DISKDRV
 #endif
 #define SUPPORT_PC88_GSX8800
 #define SUPPORT_PC88_PCG8100
+#define SUPPORT_QUASIS88_CMT
 
 // device informations for virtual machine
 #define FRAMES_PER_SEC		62.422
@@ -118,7 +138,6 @@
 #define SCSI_HOST_AUTO_ACK
 #define SCSI_DEV_IMMEDIATE_SELECT
 #endif
-#define Z80_MEMORY_WAIT
 #define OVERRIDE_SOUND_FREQ_48000HZ	55467
 
 // device informations for win32
@@ -140,10 +159,19 @@
 #define DIPSWITCH_GSX8800	0x04
 #define DIPSWITCH_PCG8100	0x08
 #define DIPSWITCH_CMDSING	0x10
-#define DIPSWITCH_DEFAULT	(DIPSWITCH_HMB20 + DIPSWITCH_GSX8800 + DIPSWITCH_PCG8100 + DIPSWITCH_CMDSING)
 #define DIPSWITCH_PALETTE	0x20
+#define DIPSWITCH_FDD_5INCH	0x40
+#define DIPSWITCH_FDD_8INCH	0x80
+#define DIPSWITCH_M88_DISKDRV	0x100
+#define DIPSWITCH_QUASIS88_CMT	0x200
+#define DIPSWITCH_16BIT		0x400
+#define DIPSWITCH_DEFAULT	(DIPSWITCH_HMB20 + DIPSWITCH_GSX8800 + DIPSWITCH_PCG8100 + DIPSWITCH_CMDSING + DIPSWITCH_FDD_5INCH)
 #define USE_JOYSTICK_TYPE	2
+#if defined(SUPPORT_PC88_FDD_8INCH)
+#define USE_FLOPPY_DISK		4
+#else
 #define USE_FLOPPY_DISK		2
+#endif
 #define USE_TAPE		1
 #define TAPE_BINARY_ONLY
 #if defined(SUPPORT_PC88_CDROM)
@@ -202,11 +230,20 @@
 #else
 	#define SOUND_VOLUME_PCG8100	0
 #endif
-#define USE_SOUND_VOLUME	(SOUND_VOLUME_OPN1 + SOUND_VOLUME_OPN2 + SOUND_VOLUME_CDROM + SOUND_VOLUME_HMB20 + SOUD_VOLUME_GSX8800 + SOUND_VOLUME_PCG8100 + 1 + 1)
+#if defined(SUPPORT_PC88_JAST)
+	#define SOUND_VOLUME_JAST	1
+#else
+	#define SOUND_VOLUME_JAST	0
+#endif
+#define USE_SOUND_VOLUME	(SOUND_VOLUME_OPN1 + SOUND_VOLUME_OPN2 + SOUND_VOLUME_CDROM + SOUND_VOLUME_HMB20 + SOUD_VOLUME_GSX8800 + SOUND_VOLUME_PCG8100 + SOUND_VOLUME_JAST + 1 + 1)
 #define USE_JOYSTICK
 #define USE_MOUSE
 #define USE_PRINTER
+#if defined(SUPPORT_PC88_JAST)
+#define USE_PRINTER_TYPE	4
+#else
 #define USE_PRINTER_TYPE	3
+#endif
 #define USE_DEBUGGER
 #define USE_STATE
 
@@ -223,9 +260,9 @@ static const _TCHAR *sound_device_caption[USE_SOUND_VOLUME] = {
 		#define NUM1 " "
 	#endif
 #ifdef SUPPORT_PC88_OPNA
-	_T("OPNA" NUM1 "(FM)"), _T("OPNA" NUM1 "(PSG)"), _T("OPNA" NUM1 "(ADPCM)"), _T("OPNA" NUM1 "(Rhythm)"),
+	_T("OPNA") _T(NUM1) _T("(FM)"), _T("OPNA") _T(NUM1) _T("(PSG)"), _T("OPNA") _T(NUM1) _T("(ADPCM)"), _T("OPNA") _T(NUM1) _T("(Rhythm)"),
 #else
-	_T("OPN" NUM1 "(FM)"), _T("OPN" NUM1 "(PSG)"),
+	_T("OPN") _T(NUM1) _T("(FM)"), _T("OPN") _T(NUM1) _T("(PSG)"),
 #endif
 #endif
 #ifdef SUPPORT_PC88_OPN2
@@ -235,9 +272,9 @@ static const _TCHAR *sound_device_caption[USE_SOUND_VOLUME] = {
 		#define NUM2 " "
 	#endif
 #ifdef SUPPORT_PC88_OPNA
-	_T("OPNA" NUM2 "(FM)"), _T("OPNA" NUM2 "(PSG)"), _T("OPNA" NUM2 "(ADPCM)"), _T("OPNA" NUM2 "(Rhythm)"),
+	_T("OPNA") _T(NUM2) _T("(FM)"), _T("OPNA") _T(NUM2) _T("(PSG)"), _T("OPNA") _T(NUM2) _T("(ADPCM)"), _T("OPNA") _T(NUM2) _T("(Rhythm)"),
 #else
-	_T("OPN" NUM2 "(FM)"), _T("OPN" NUM2 "(PSG)"),
+	_T("OPN") _T(NUM2) _T("(FM)"), _T("OPN") _T(NUM2) _T("(PSG)"),
 #endif
 #endif
 #ifdef SUPPORT_PC88_CDROM
@@ -252,6 +289,9 @@ static const _TCHAR *sound_device_caption[USE_SOUND_VOLUME] = {
 #ifdef SUPPORT_PC88_PCG8100
 	_T("PCG-8100"),
 #endif
+#ifdef SUPPORT_PC88_JAST
+	_T("JAST SOUND"),
+#endif
 	_T("Beep"), _T("Noise (FDD)"),
 };
 #endif
@@ -260,6 +300,7 @@ class EMU;
 class DEVICE;
 class EVENT;
 
+class DISK;
 class I8251;
 class I8255;
 class NOISE;
@@ -286,8 +327,19 @@ class YM2151;
 class AY_3_891X;
 #endif
 
-#if defined(SUPPORT_PC88_GSX8800) || defined(SUPPORT_PC88_PCG8100)
+#if defined(SUPPORT_PC88_GSX8800) || defined(SUPPORT_PC88_PCG8100) || defined(SUPPORT_PC88_16BIT)
 class I8253;
+#endif
+
+#if defined(SUPPORT_PC88_16BIT)
+class I8259;
+class I86;
+class IO;
+class MEMORY;
+#endif
+
+#ifdef SUPPORT_M88_DISKDRV
+class DiskIO;
 #endif
 
 class PC88;
@@ -321,6 +373,13 @@ protected:
 	NOISE* pc88noise_head_up;
 	Z80* pc88cpu_sub;
 	
+#ifdef SUPPORT_PC88_FDD_8INCH
+	UPD765A* pc88fdc_8inch;
+	NOISE* pc88noise_8inch_seek;
+	NOISE* pc88noise_8inch_head_down;
+	NOISE* pc88noise_8inch_head_up;
+#endif
+	
 #ifdef SUPPORT_PC88_CDROM
 	SCSI_HOST* pc88scsi_host;
 	SCSI_CDROM* pc88scsi_cdrom;
@@ -345,9 +404,28 @@ protected:
 	PCM1BIT* pc88pcg_pcm3;
 #endif
 	
+#ifdef SUPPORT_PC88_16BIT
+	I8253* pc88pit_16bit;
+	I8255* pc88pio_16bit;
+	I8259* pc88pic_16bit;
+	I86* pc88cpu_16bit;
+	IO* pc88io_16bit;
+	MEMORY* pc88mem_16bit;
+	uint8_t pc88rom_16bit[0x1000];
+	uint8_t pc88ram_16bit[0x20000];
+#endif
+	
+#ifdef SUPPORT_M88_DISKDRV
+	DiskIO* pc88diskio;
+#endif
+	
 	PC88* pc88;
 	
 	int boot_mode;
+	
+	// drives
+	UPD765A *get_floppy_disk_controller(int drv);
+	DISK *get_floppy_disk_handler(int drv);
 	
 public:
 	// ----------------------------------------
@@ -391,10 +469,12 @@ public:
 	// user interface
 	void open_floppy_disk(int drv, const _TCHAR* file_path, int bank);
 	void close_floppy_disk(int drv);
+	bool is_floppy_disk_connected(int drv);
 	bool is_floppy_disk_inserted(int drv);
 	void is_floppy_disk_protected(int drv, bool value);
 	bool is_floppy_disk_protected(int drv);
 	uint32_t is_floppy_disk_accessed();
+	uint32_t floppy_disk_indicator_color();
 	void play_tape(int drv, const _TCHAR* file_path);
 	void rec_tape(int drv, const _TCHAR* file_path);
 	void close_tape(int drv);

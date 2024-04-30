@@ -9,6 +9,11 @@
 
 #include "osd.h"
 
+#ifdef _UNITY
+#include "..\winplugin\emuwrap.h"
+extern emuwrap g_emucore;
+#endif
+
 #define REC_VIDEO_SUCCESS	1
 #define REC_VIDEO_FULL		2
 #define REC_VIDEO_ERROR		3
@@ -36,13 +41,22 @@ void OSD::initialize_screen()
 //#endif
 	memset(&stretched_screen_buffer, 0, sizeof(bitmap_t));
 	memset(&shrinked_screen_buffer, 0, sizeof(bitmap_t));
+	memset(&reversed_screen_buffer, 0, sizeof(bitmap_t));
 	memset(&video_screen_buffer, 0, sizeof(bitmap_t));
 	
+#ifdef SUPPORT_D2D1
+	pD2d1Factory = NULL;
+	pD2d1DCRenderTarget = NULL;
+	pD2d1HwndRenderTarget = NULL;
+	pD2d1Bitmap = NULL;
+#endif
+#ifdef SUPPORT_D3D9
 	lpd3d9 = NULL;
 	lpd3d9Device = NULL;
 	lpd3d9Surface = NULL;
 	lpd3d9OffscreenSurface = NULL;
-	
+	d3d9_device_lost = false;
+#endif
 	now_record_video = false;
 	pAVIStream = NULL;
 	pAVICompressed = NULL;
@@ -57,7 +71,12 @@ void OSD::release_screen()
 {
 	stop_record_video();
 	
+#ifdef SUPPORT_D2D1
+	release_d2d1();
+#endif
+#ifdef SUPPORT_D3D9
 	release_d3d9();
+#endif
 	release_screen_buffer(&vm_screen_buffer);
 #ifdef USE_SCREEN_FILTER
 	release_screen_buffer(&filtered_screen_buffer);
@@ -68,6 +87,7 @@ void OSD::release_screen()
 //#endif
 	release_screen_buffer(&stretched_screen_buffer);
 	release_screen_buffer(&shrinked_screen_buffer);
+	release_screen_buffer(&reversed_screen_buffer);
 	release_screen_buffer(&video_screen_buffer);
 }
 
@@ -139,8 +159,10 @@ void OSD::set_vm_screen_size(int screen_width, int screen_height, int window_wid
 			vm_window_width_aspect = window_width_aspect;
 			vm_window_height_aspect = window_height_aspect;
 			
+#ifndef _UNITY		// MARU
 			// change the window size
 			PostMessage(main_window_handle, WM_RESIZE, 0L, 0L);
+#endif
 		} else {
 			// to make sure
 			set_host_window_size(-1, -1, host_window_mode);
@@ -292,36 +314,78 @@ int OSD::draw_screen()
 		draw_screen_buffer = &stretched_screen_buffer;
 	}
 	
-	// initialize d3d9 surface
+	// initialize d2d1/d3d9 surface
+#ifdef SUPPORT_D2D1
+	static bool prev_use_d2d1 = config.use_d2d1;
+	static bool prev_use_dcrender = (host_window_mode && config.show_status_bar);
+#endif
+#ifdef SUPPORT_D3D9
 	static bool prev_use_d3d9 = config.use_d3d9;
 	static bool prev_wait_vsync = config.wait_vsync;
+#endif
 	static int prev_window_width = 0, prev_window_height = 0;
 	static int prev_screen_width = 0, prev_screen_height = 0;
 	
-	if(prev_use_d3d9 != config.use_d3d9 || prev_wait_vsync != config.wait_vsync || prev_window_width != host_window_width || prev_window_height != host_window_height) {
+	if(
+#ifdef SUPPORT_D2D1
+		prev_use_d2d1 != config.use_d2d1 || prev_use_dcrender != (host_window_mode && config.show_status_bar) ||
+#endif
+#ifdef SUPPORT_D3D9
+		prev_use_d3d9 != config.use_d3d9 || prev_wait_vsync != config.wait_vsync || (prev_use_d3d9 && d3d9_device_lost) ||
+#endif
+		prev_window_width != host_window_width || prev_window_height != host_window_height
+	) {
+#ifdef SUPPORT_D2D1
+		if(config.use_d2d1) {
+			config.use_d2d1 = initialize_d2d1();
+		} else {
+			release_d2d1();
+		}
+		prev_use_d2d1 = config.use_d2d1;
+		prev_use_dcrender = (host_window_mode && config.show_status_bar);
+#endif
+#ifdef SUPPORT_D3D9
 		if(config.use_d3d9) {
 			config.use_d3d9 = initialize_d3d9();
 		} else {
 			release_d3d9();
 		}
+		d3d9_device_lost = false;
 		prev_use_d3d9 = config.use_d3d9;
 		prev_wait_vsync = config.wait_vsync;
+#endif
 		prev_window_width = host_window_width;
 		prev_window_height = host_window_height;
 		prev_screen_width = prev_screen_height = 0;
 	}
 	if(prev_screen_width != draw_screen_buffer->width || prev_screen_height != draw_screen_buffer->height) {
+#ifdef SUPPORT_D2D1
+		if(config.use_d2d1) {
+			config.use_d2d1 = initialize_d2d1_surface(draw_screen_buffer);
+		}
+#endif
+#ifdef SUPPORT_D3D9
 		if(config.use_d3d9) {
 			config.use_d3d9 = initialize_d3d9_surface(draw_screen_buffer);
 		}
+#endif
 		prev_screen_width = draw_screen_buffer->width;
 		prev_screen_height = draw_screen_buffer->height;
 	}
 	
+#ifdef SUPPORT_D2D1
+	if(config.use_d2d1) {
+		// copy screen to d2d1 offscreen surface
+		copy_to_d2d1_surface(draw_screen_buffer);
+	} else
+#endif
+#ifdef SUPPORT_D3D9
 	if(config.use_d3d9) {
 		// copy screen to d3d9 offscreen surface
 		copy_to_d3d9_surface(draw_screen_buffer);
-	} else {
+	} else
+#endif
+	{
 		if(draw_screen_buffer->width != draw_screen_width || draw_screen_buffer->height != draw_screen_height) {
 			if(shrinked_screen_buffer.width != draw_screen_width || shrinked_screen_buffer.height != draw_screen_height) {
 				initialize_screen_buffer(&shrinked_screen_buffer, draw_screen_width, draw_screen_height, HALFTONE);
@@ -332,6 +396,8 @@ int OSD::draw_screen()
 	}
 #endif
 	
+#ifndef _UNITY
+	// MARU: ここが実質的なウィンドウ描画？
 	// invalidate window
 #ifdef ONE_BOARD_MICRO_COMPUTER
 	if(first_invalidate) {
@@ -358,6 +424,7 @@ int OSD::draw_screen()
 	InvalidateRect(main_window_handle, &rect, first_invalidate);
 #endif
 	UpdateWindow(main_window_handle);
+#endif
 	first_draw_screen = self_invalidate = true;
 	
 	// record avi file
@@ -370,9 +437,11 @@ int OSD::draw_screen()
 
 void OSD::invalidate_screen()
 {
+#ifndef _UNITY
 //	InvalidateRect(main_window_handle, NULL, TRUE);
 	RECT rect = { 0, 0, host_window_width, host_window_height };
 	InvalidateRect(main_window_handle, &rect, TRUE);
+#endif
 }
 
 void OSD::update_screen(HDC hdc)
@@ -444,25 +513,24 @@ void OSD::update_screen(HDC hdc)
 	}
 #else
 	if(first_draw_screen) {
+#ifndef _UNITY			// MARU
 		int dest_x = (host_window_width - draw_screen_width) / 2;
 		int dest_y = (host_window_height - draw_screen_height) / 2;
 		
+#ifdef SUPPORT_D2D1
+		if(config.use_d2d1) {
+			update_d2d1_screen(dest_x, dest_y);
+		} else
+#endif
+#ifdef SUPPORT_D3D9
 		if(config.use_d3d9) {
-			LPDIRECT3DSURFACE9 lpd3d9BackSurface = NULL;
-			if(lpd3d9Device != NULL && lpd3d9Device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &lpd3d9BackSurface) == D3D_OK && lpd3d9BackSurface != NULL) {
-				RECT rectSrc = { 0, 0, draw_screen_buffer->width, draw_screen_buffer->height };
-				RECT rectDst = { dest_x, dest_y, dest_x + draw_screen_width, dest_y + draw_screen_height };
-				RECT rectWin = { 0, 0, host_window_width, host_window_height };
-				bool stretch_screen = !(draw_screen_buffer->width == draw_screen_width && draw_screen_buffer->height == draw_screen_height);
-				
-				lpd3d9Device->UpdateSurface(lpd3d9OffscreenSurface, NULL, lpd3d9Surface, NULL);
-				lpd3d9Device->StretchRect(lpd3d9Surface, &rectSrc, lpd3d9BackSurface, &rectDst, stretch_screen ? D3DTEXF_LINEAR : D3DTEXF_POINT);
-				lpd3d9BackSurface->Release();				
-				lpd3d9Device->Present(&rectWin, &rectWin, NULL, NULL);
-			}
-		} else {
+			update_d3d9_screen(dest_x, dest_y);
+		} else
+#endif
+		{
 			BitBlt(hdc, dest_x, dest_y, draw_screen_width, draw_screen_height, draw_screen_buffer->hdcDib, 0, 0, SRCCOPY);
 		}
+#endif				// _UNITY
 		first_invalidate = self_invalidate = false;
 	}
 #endif
@@ -1034,13 +1102,144 @@ void OSD::stretch_screen_buffer(bitmap_t *source, bitmap_t *dest)
 }
 
 #if defined(_RGB555)
+	#define DXGI_FORMAT_TMP DXGI_FORMAT_B5G5R5A1_UNORM
 	#define D3DFMT_TMP D3DFMT_X1R5G5B5
 #elif defined(_RGB565)
+	#define DXGI_FORMAT_TMP DXGI_FORMAT_B5G6R5_UNORM
 	#define D3DFMT_TMP D3DFMT_R5G6B5
 #elif defined(_RGB888)
+	#define DXGI_FORMAT_TMP DXGI_FORMAT_B8G8R8A8_UNORM
 	#define D3DFMT_TMP D3DFMT_X8R8G8B8
 #endif
 
+#ifdef SUPPORT_D2D1
+bool OSD::initialize_d2d1()
+{
+	release_d2d1();
+	
+	if(!FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, &pD2d1Factory))) {
+		if(host_window_mode && config.show_status_bar) {
+			D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties(
+				D2D1_RENDER_TARGET_TYPE_DEFAULT,
+				D2D1::PixelFormat(DXGI_FORMAT_TMP, D2D1_ALPHA_MODE_IGNORE),
+				0, 0,
+				D2D1_RENDER_TARGET_USAGE_NONE,
+				D2D1_FEATURE_LEVEL_DEFAULT
+			);
+			if(!FAILED(pD2d1Factory->CreateDCRenderTarget(&props, &pD2d1DCRenderTarget))) {
+				int dest_x = (host_window_width - draw_screen_width) / 2;
+				int dest_y = (host_window_height - draw_screen_height) / 2;
+				RECT rect = { dest_x, dest_y, dest_x + draw_screen_width, dest_y + draw_screen_height };
+				if(!FAILED(pD2d1DCRenderTarget->BindDC(GetDC(main_window_handle), &rect))) {
+					return true;
+				}
+			}
+		} else {
+			if(!FAILED(pD2d1Factory->CreateHwndRenderTarget(
+				D2D1::RenderTargetProperties(),
+				D2D1::HwndRenderTargetProperties(main_window_handle, D2D1::SizeU(host_window_width, host_window_height)),
+				&pD2d1HwndRenderTarget
+			))) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+bool OSD::initialize_d2d1_surface(bitmap_t *buffer)
+{
+	if(host_window_mode && config.show_status_bar) {
+		if(pD2d1DCRenderTarget != NULL) {
+			if(!FAILED(pD2d1DCRenderTarget->CreateBitmap(
+				D2D1::SizeU(buffer->width, buffer->height),
+				D2D1::BitmapProperties(D2D1::PixelFormat(DXGI_FORMAT_TMP, D2D1_ALPHA_MODE_IGNORE)),
+				&pD2d1Bitmap
+			))) {
+				return true;
+			}
+		}
+	} else {
+		if(pD2d1HwndRenderTarget != NULL) {
+			if(!FAILED(pD2d1HwndRenderTarget->CreateBitmap(
+				D2D1::SizeU(buffer->width, buffer->height),
+				D2D1::BitmapProperties(D2D1::PixelFormat(DXGI_FORMAT_TMP, D2D1_ALPHA_MODE_IGNORE)),
+				&pD2d1Bitmap
+			))) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+void OSD::release_d2d1()
+{
+	release_d2d1_surface();
+	
+	if(pD2d1DCRenderTarget != NULL) {
+		pD2d1DCRenderTarget->Release();
+		pD2d1DCRenderTarget = NULL;
+	}
+	if(pD2d1HwndRenderTarget != NULL) {
+		pD2d1HwndRenderTarget->Release();
+		pD2d1HwndRenderTarget = NULL;
+	}
+	if(pD2d1Factory != NULL) {
+		pD2d1Factory->Release();
+		pD2d1Factory = NULL;
+	}
+}
+
+void OSD::release_d2d1_surface()
+{
+	if(pD2d1Bitmap != NULL) {
+		pD2d1Bitmap->Release();
+		pD2d1Bitmap = NULL;
+	}
+}
+
+void OSD::copy_to_d2d1_surface(bitmap_t *buffer)
+{
+	if(reversed_screen_buffer.width != buffer->width || reversed_screen_buffer.height != buffer->height) {
+		initialize_screen_buffer(&reversed_screen_buffer, buffer->width, buffer->height, HALFTONE);
+	}
+	for(int y = 0; y < buffer->height; y++) {
+		scrntype_t* source_buffer = buffer->get_buffer(buffer->height - y - 1);
+		scrntype_t* dest_buffer = reversed_screen_buffer.get_buffer(y);
+		
+		for(int x = 0; x < buffer->width; x++) {
+			dest_buffer[x] = source_buffer[x];
+		}
+	}
+	pD2d1Bitmap->CopyFromMemory(nullptr, reinterpret_cast< const void* >(reversed_screen_buffer.lpBmp), sizeof(scrntype_t) * reversed_screen_buffer.width);
+}
+
+void OSD::update_d2d1_screen(int dest_x, int dest_y)
+{
+	D2D1_RECT_F rect = { (FLOAT)dest_x, (FLOAT)dest_y, (FLOAT)(dest_x + draw_screen_width), (FLOAT)(dest_y + draw_screen_height) };
+	HRESULT hr = 0;
+	
+	if(host_window_mode && config.show_status_bar) {
+		if(pD2d1DCRenderTarget != NULL) {
+			pD2d1DCRenderTarget->BeginDraw();
+			pD2d1DCRenderTarget->DrawBitmap(pD2d1Bitmap, &rect, 1.0f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+			hr = pD2d1DCRenderTarget->EndDraw();
+		}
+	} else {
+		if(pD2d1HwndRenderTarget != NULL) {
+			pD2d1HwndRenderTarget->BeginDraw();
+			pD2d1HwndRenderTarget->DrawBitmap(pD2d1Bitmap, &rect, 1.0f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+			hr = pD2d1HwndRenderTarget->EndDraw();
+		}
+	}
+	if(hr == D2DERR_RECREATE_TARGET) {
+		set_host_window_size(-1, -1, host_window_mode);
+	}
+}
+#endif
+
+#ifdef SUPPORT_D3D9
 bool OSD::initialize_d3d9()
 {
 	release_d3d9();
@@ -1144,6 +1343,24 @@ void OSD::copy_to_d3d9_surface(bitmap_t *buffer)
 	}
 	
 }
+
+void OSD::update_d3d9_screen(int dest_x, int dest_y)
+{
+	LPDIRECT3DSURFACE9 lpd3d9BackSurface = NULL;
+	
+	if(lpd3d9Device != NULL && lpd3d9Device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &lpd3d9BackSurface) == D3D_OK && lpd3d9BackSurface != NULL) {
+		RECT rectSrc = { 0, 0, draw_screen_buffer->width, draw_screen_buffer->height };
+		RECT rectDst = { dest_x, dest_y, dest_x + draw_screen_width, dest_y + draw_screen_height };
+		RECT rectWin = { 0, 0, host_window_width, host_window_height };
+		bool stretch_screen = !(draw_screen_buffer->width == draw_screen_width && draw_screen_buffer->height == draw_screen_height);
+		
+		lpd3d9Device->UpdateSurface(lpd3d9OffscreenSurface, NULL, lpd3d9Surface, NULL);
+		lpd3d9Device->StretchRect(lpd3d9Surface, &rectSrc, lpd3d9BackSurface, &rectDst, stretch_screen ? D3DTEXF_LINEAR : D3DTEXF_POINT);
+		lpd3d9BackSurface->Release();
+		if(lpd3d9Device->Present(&rectWin, &rectWin, NULL, NULL) == D3DERR_DEVICELOST) d3d9_device_lost = true;
+	}
+}
+#endif
 
 void OSD::capture_screen()
 {
@@ -1422,9 +1639,9 @@ int OSD::get_text_width(bitmap_t *bitmap, font_t *font, const char *text)
 #ifdef _UNICODE
 	_TCHAR unicode[1024];
 	MultiByteToWideChar(CP_ACP, 0, text, -1, unicode, 1024);
-	GetTextExtentPoint32(bitmap->hdcDib, unicode, wcslen(unicode), &size);
+	GetTextExtentPoint32(bitmap->hdcDib, unicode, (int)wcslen(unicode), &size);
 #else
-	GetTextExtentPoint32(bitmap->hdcDib, text, strlen(text), &size);
+	GetTextExtentPoint32(bitmap->hdcDib, text, (int)strlen(text), &size);
 #endif
 	SelectObject(bitmap->hdcDib, hFontOld);
 	return (int)size.cx;
@@ -1438,9 +1655,9 @@ void OSD::draw_text_to_bitmap(bitmap_t *bitmap, font_t *font, int x, int y, cons
 #ifdef _UNICODE
 	_TCHAR unicode[1024];
 	MultiByteToWideChar(CP_ACP, 0, text, -1, unicode, 1024);
-	ExtTextOut(bitmap->hdcDib, x, y, NULL, NULL, unicode, wcslen(unicode), NULL);
+	ExtTextOut(bitmap->hdcDib, x, y, NULL, NULL, unicode, (UINT)wcslen(unicode), NULL);
 #else
-	ExtTextOut(bitmap->hdcDib, x, y, NULL, NULL, text, strlen(text), NULL);
+	ExtTextOut(bitmap->hdcDib, x, y, NULL, NULL, text, (UINT)strlen(text), NULL);
 #endif
 	SelectObject(bitmap->hdcDib, hFontOld);
 }

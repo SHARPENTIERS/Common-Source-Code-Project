@@ -730,6 +730,26 @@
 					</FileConfiguration>
 				</File>
 				<File
+					RelativePath="..\src\vm\pcm8bit.cpp"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+				</File>
+				<File
 					RelativePath="..\src\vm\prnfile.cpp"
 					>
 					<FileConfiguration
@@ -1019,6 +1039,26 @@
 				Name="VM Driver Source Files"
 				Filter="cpp"
 				>
+				<File
+					RelativePath="..\src\vm\x1\cz8rb.cpp"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+				</File>
 				<File
 					RelativePath="..\src\vm\x1\display.cpp"
 					>
@@ -1384,6 +1424,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\src\vm\pcm8bit.h"
+					>
+				</File>
+				<File
 					RelativePath="..\src\vm\prnfile.h"
 					>
 				</File>
@@ -1473,6 +1517,10 @@
 				Filter="h"
 				>
 				<File
+					RelativePath="..\src\vm\x1\cz8rb.h"
+					>
+				</File>
+				<File
 					RelativePath="..\src\vm\x1\display.h"
 					>
 				</File>
@@ -1535,6 +1583,18 @@
 			Filter="ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe"
 			>
 			<File
+				RelativePath="..\src\res\indicator\access_green.bmp"
+				>
+			</File>
+			<File
+				RelativePath="..\src\res\indicator\access_off.bmp"
+				>
+			</File>
+			<File
+				RelativePath="..\src\res\indicator\access_on.bmp"
+				>
+			</File>
+			<File
 				RelativePath="..\src\res\resource.h"
 				>
 			</File>
@@ -1563,14 +1623,6 @@
 						AdditionalIncludeDirectories="..\src\res"
 					/>
 				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="..\src\res\indicator\access_off.bmp"
-				>
-			</File>
-			<File
-				RelativePath="..\src\res\indicator\access_on.bmp"
-				>
 			</File>
 		</Filter>
 	</Files>

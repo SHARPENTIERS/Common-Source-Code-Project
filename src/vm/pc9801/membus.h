@@ -47,12 +47,6 @@ private:
 	uint8_t bios[0x10000];
 #endif
 #if defined(SUPPORT_BIOS_RAM)
-#if !defined(SUPPORT_HIRESO)
-	uint8_t bios_ram[0x18000];
-#else
-	uint8_t bios_ram[0x10000];
-#endif
-//	uint8_t bios_ram[sizeof(bios)];
 	bool bios_ram_selected;
 #endif
 #if defined(SUPPORT_ITF_ROM)
@@ -107,6 +101,7 @@ private:
 	uint32_t window_80000h;
 	uint32_t window_a0000h;
 #endif
+	inline bool get_memory_addr(uint32_t *addr);
 	
 public:
 	MEMBUS(VM_TEMPLATE* parent_vm, EMU* parent_emu) : MEMORY(parent_vm, parent_emu)
@@ -121,11 +116,17 @@ public:
 	void write_io8(uint32_t addr, uint32_t data);
 	uint32_t read_io8(uint32_t addr);
 #if defined(SUPPORT_24BIT_ADDRESS) || defined(SUPPORT_32BIT_ADDRESS)
-	uint32_t read_data8(uint32_t addr);
-	void write_data8(uint32_t addr, uint32_t data);
-	uint32_t read_dma_data8(uint32_t addr);
-	void write_dma_data8(uint32_t addr, uint32_t data);
+	void write_data8w(uint32_t addr, uint32_t data, int *wait);
+	uint32_t read_data8w(uint32_t addr, int *wait);
+	void write_data16w(uint32_t addr, uint32_t data, int *wait);
+	uint32_t read_data16w(uint32_t addr, int *wait);
+	void write_data32w(uint32_t addr, uint32_t data, int *wait);
+	uint32_t read_data32w(uint32_t addr, int *wait);
 #endif
+	void write_dma_data8w(uint32_t addr, uint32_t data, int *wait);
+	uint32_t read_dma_data8w(uint32_t addr, int *wait);
+	void write_dma_data16w(uint32_t addr, uint32_t data, int *wait);
+	uint32_t read_dma_data16w(uint32_t addr, int *wait);
 	bool process_state(FILEIO* state_fio, bool loading);
 	
 	// unique functions

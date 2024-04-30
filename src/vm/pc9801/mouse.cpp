@@ -67,28 +67,46 @@ uint32_t MOUSE::read_io8(uint32_t addr)
 void MOUSE::event_callback(int event_id, int err)
 {
 	if(!(ctrlreg & 0x10)) {
-		d_pic->write_signal(SIG_I8259_CHIP1 | SIG_I8259_IR5, 1, 1);
+		#if !defined(SUPPORT_HIRESO)
+			d_pic->write_signal(SIG_I8259_CHIP1 | SIG_I8259_IR5, 1, 1);
+		#else
+			d_pic->write_signal(SIG_I8259_CHIP0 | SIG_I8259_IR6, 1, 1);
+		#endif
 	}
 	if(cur_freq != (freq & 3)) {
 		cancel_event(this, register_id);
-		register_event(this, EVENT_TIMER, 1000000.0 / freq_table[freq & 3] + err, true, &register_id);
+		register_event(this, EVENT_TIMER, 1000000.0 / freq_table[freq & 3], true, &register_id);
 		cur_freq = freq & 3;
 	}
 }
 
 void MOUSE::event_frame()
 {
-	dx += status[0];
-	if(dx > 64) {
-		dx = 64;
-	} else if(dx < -64) {
-		dx = -64;
+	int x = status[0];
+	int y = status[1];
+	
+	if(x > 32) {
+		x = 32;
+	} else if(x < -32) {
+		x = -32;
 	}
-	dy += status[1];
-	if(dy > 64) {
-		dy = 64;
-	} else if(dy < -64) {
-		dy = -64;
+	if(y > 32) {
+		y = 32;
+	} else if(y < -32) {
+		y = -32;
+	}
+	dx += x;
+	dy += y;
+	
+	if(dx > 127) {
+		dx = 127;
+	} else if(dx < -128) {
+		dx = -128;
+	}
+	if(dy > 127) {
+		dy = 127;
+	} else if(dy < -128) {
+		dy = -128;
 	}
 	update_mouse();
 }

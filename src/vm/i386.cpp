@@ -3,7 +3,7 @@
 
 	Origin : MAME i386 core
 	Author : Takeda.Toshiya
-	Date  : 2009.06.08-
+	Date   : 2009.06.08-
 
 	[ i386/i486/Pentium/MediaGX ]
 */
@@ -11,6 +11,7 @@
 #include "i386.h"
 #ifdef USE_DEBUGGER
 #include "debugger.h"
+#include "i386_dasm.h"
 #endif
 
 /* ----------------------------------------------------------------------------
@@ -78,21 +79,6 @@
 #define CPU_TRANSLATE_NAME(name)		cpu_translate_##name
 #define CPU_TRANSLATE(name)			int CPU_TRANSLATE_NAME(name)(void *cpudevice, address_spacenum space, int intention, offs_t *address)
 #define CPU_TRANSLATE_CALL(name)		CPU_TRANSLATE_NAME(name)(cpudevice, space, intention, address)
-
-#define CPU_DISASSEMBLE_NAME(name)		cpu_disassemble_##name
-#define CPU_DISASSEMBLE(name)			int CPU_DISASSEMBLE_NAME(name)(_TCHAR *buffer, offs_t eip, const UINT8 *oprom)
-#define CPU_DISASSEMBLE_CALL(name)		CPU_DISASSEMBLE_NAME(name)(buffer, eip, oprom)
-
-/*****************************************************************************/
-/* src/emu/didisasm.h */
-
-// Disassembler constants
-const UINT32 DASMFLAG_SUPPORTED     = 0x80000000;   // are disassembly flags supported?
-const UINT32 DASMFLAG_STEP_OUT      = 0x40000000;   // this instruction should be the end of a step out sequence
-const UINT32 DASMFLAG_STEP_OVER     = 0x20000000;   // this instruction should be stepped over by setting a breakpoint afterwards
-const UINT32 DASMFLAG_OVERINSTMASK  = 0x18000000;   // number of extra instructions to skip when stepping over
-const UINT32 DASMFLAG_OVERINSTSHIFT = 27;           // bits to shift after masking to get the value
-const UINT32 DASMFLAG_LENGTHMASK    = 0x0000ffff;   // the low 16-bits contain the actual length
 
 /*****************************************************************************/
 /* src/emu/diexec.h */
@@ -182,13 +168,7 @@ enum address_spacenum
 // offsets and addresses are 32-bit (for now...)
 typedef UINT32	offs_t;
 
-/*****************************************************************************/
-/* src/osd/osdcomm.h */
-
-/* Highly useful macro for compile-time knowledge of an array size */
-#define ARRAY_LENGTH(x)     (sizeof(x) / sizeof(x[0]))
-
-#ifdef I386_PSEUDO_BIOS
+#ifdef I86_PSEUDO_BIOS
 #define BIOS_INT(num) if(cpustate->bios != NULL) { \
 	uint16_t regs[8], sregs[4]; \
 	regs[0] = REG16(AX); regs[1] = REG16(CX); regs[2] = REG16(DX); regs[3] = REG16(BX); \
@@ -227,9 +207,6 @@ static CPU_TRANSLATE(i386);
 #include "mame/lib/softfloat/fsincos.c"
 #include "mame/emu/cpu/vtlb.c"
 #include "mame/emu/cpu/i386/i386.c"
-#ifdef USE_DEBUGGER
-#include "mame/emu/cpu/i386/i386dasm.c"
-#endif
 
 void I386::initialize()
 {
@@ -239,7 +216,7 @@ void I386::initialize()
 	cpustate->pic = d_pic;
 	cpustate->program = d_mem;
 	cpustate->io = d_io;
-#ifdef I386_PSEUDO_BIOS
+#ifdef I86_PSEUDO_BIOS
 	cpustate->bios = d_bios;
 #endif
 #ifdef SINGLE_MODE_DMA
@@ -364,7 +341,8 @@ void I386::write_debug_io8(uint32_t addr, uint32_t data)
 	d_io->write_io8w(addr, data, &wait);
 }
 
-uint32_t I386::read_debug_io8(uint32_t addr) {
+uint32_t I386::read_debug_io8(uint32_t addr)
+{
 	int wait;
 	return d_io->read_io8w(addr, &wait);
 }
@@ -375,7 +353,8 @@ void I386::write_debug_io16(uint32_t addr, uint32_t data)
 	d_io->write_io16w(addr, data, &wait);
 }
 
-uint32_t I386::read_debug_io16(uint32_t addr) {
+uint32_t I386::read_debug_io16(uint32_t addr)
+{
 	int wait;
 	return d_io->read_io16w(addr, &wait);
 }
@@ -386,7 +365,8 @@ void I386::write_debug_io32(uint32_t addr, uint32_t data)
 	d_io->write_io32w(addr, data, &wait);
 }
 
-uint32_t I386::read_debug_io32(uint32_t addr) {
+uint32_t I386::read_debug_io32(uint32_t addr)
+{
 	int wait;
 	return d_io->read_io32w(addr, &wait);
 }
@@ -497,17 +477,16 @@ int I386::debug_dasm(uint32_t pc, _TCHAR *buffer, size_t buffer_len)
 {
 	i386_state *cpustate = (i386_state *)opaque;
 	UINT64 eip = pc - cpustate->sreg[CS].base;
-	UINT8 ops[16];
+	UINT8 oprom[16];
+	
 	for(int i = 0; i < 16; i++) {
 		int wait;
-		ops[i] = d_mem->read_data8w(pc + i, &wait);
+		oprom[i] = d_mem->read_data8w((pc + i) & cpustate->a20_mask, &wait);
 	}
-	UINT8 *oprom = ops;
-	
 	if(cpustate->operand_size) {
-		return CPU_DISASSEMBLE_CALL(x86_32) & DASMFLAG_LENGTHMASK;
+		return i386_dasm(oprom, eip, true,  buffer, buffer_len);
 	} else {
-		return CPU_DISASSEMBLE_CALL(x86_16) & DASMFLAG_LENGTHMASK;
+		return i386_dasm(oprom, eip, false, buffer, buffer_len);
 	}
 }
 #endif

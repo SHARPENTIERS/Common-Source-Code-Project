@@ -47,6 +47,7 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	event = new EVENT(this, emu);	// must be 2nd device
 	
 	io = new IO(this, emu);
+	io->space = 0x10000;
 	flipflop = new LS393(this, emu);
 	fdc = new MB8877(this, emu);
 	fdc->set_context_noise_seek(new NOISE(this, emu));
@@ -73,6 +74,8 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	floppy = new FLOPPY(this, emu);
 	keyboard = new KEYBOARD(this, emu);
 	membus = new MEMBUS(this, emu);
+	membus->space = 0x10000;
+	membus->bank_size = 0x800;
 	rtc = new RTC(this, emu);
 	
 	// set contexts
@@ -357,8 +360,8 @@ bool VM::process_state(FILEIO* state_fio, bool loading)
 		return false;
 	}
 	for(DEVICE* device = first_device; device; device = device->next_device) {
-		const char *name = typeid(*device).name() + 6; // skip "class "
-		int len = strlen(name);
+		const _TCHAR *name = char_to_tchar(typeid(*device).name() + 6); // skip "class "
+		int len = (int)_tcslen(name);
 		
 		if(!state_fio->StateCheckInt32(len)) {
 			return false;

@@ -13,7 +13,8 @@
 #include "../event.h"
 
 #include "../beep.h"
-#include "../i386.h"
+#include "../i386_np21.h"
+//#include "../i386.h"
 #include "../i8237.h"
 #include "../i8251.h"
 #include "../i8253.h"
@@ -48,6 +49,7 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	
 	beep = new BEEP(this, emu);
 	cpu = new I386(this, emu);
+	cpu->device_model = INTEL_80386;
 	dma = new I8237(this, emu);
 #ifdef USE_DEBUGGER
 	dma->set_context_debugger(new DEBUGGER(this, emu));
@@ -62,7 +64,10 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	pio_p = new I8255(this, emu);	// for printer
 	pio_p->set_device_name(_T("8255 PIO (Printer)"));
 	pic = new I8259(this, emu);
+	pic->num_chips = 2;
 	io = new IO(this, emu);
+	io->space = 0x10000;
+	io->bus_width = 16;
 	rtc = new UPD1990A(this, emu);
 	gdc_c = new UPD7220(this, emu);
 	gdc_c->set_device_name(_T("uPD7220 GDC (Character)"));
@@ -88,7 +93,7 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	
 //???	sio_r->set_context_rxrdy(pic, SIG_I8259_CHIP0 | SIG_I8259_IR4, 1);
 	sio_k->set_context_rxrdy(pic, SIG_I8259_CHIP0 | SIG_I8259_IR1, 1);
-	sio_k->set_context_rst(keyboard, SIG_KEYBOARD_RST, 1);
+	sio_k->set_context_brk(keyboard, SIG_KEYBOARD_RST, 1);
 	sio_k->set_context_out(keyboard, SIG_KEYBOARD_RECV);
 	pit->set_context_ch0(pic, SIG_I8259_CHIP0 | SIG_I8259_IR0, 1);
 	pit->set_constant_clock(0, 1996800);
@@ -97,6 +102,7 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	pio_s->set_context_port_c(beep, SIG_BEEP_MUTE, 8, 0);
 	pic->set_context_cpu(cpu);
 	rtc->set_context_dout(pio_s, SIG_I8255_PORT_B, 1);
+	dma->set_context_cpu(cpu);
 	dma->set_context_memory(memory);
 	dma->set_context_ch2(fdc);	// 1MB
 	dma->set_context_ch3(fdc);	// 640KB
@@ -423,7 +429,7 @@ void VM::update_config()
 	}
 }
 
-#define STATE_VERSION	2
+#define STATE_VERSION	3
 
 bool VM::process_state(FILEIO* state_fio, bool loading)
 {
@@ -431,8 +437,8 @@ bool VM::process_state(FILEIO* state_fio, bool loading)
 		return false;
 	}
 	for(DEVICE* device = first_device; device; device = device->next_device) {
-		const char *name = typeid(*device).name() + 6; // skip "class "
-		int len = strlen(name);
+		const _TCHAR *name = char_to_tchar(typeid(*device).name() + 6); // skip "class "
+		int len = (int)_tcslen(name);
 		
 		if(!state_fio->StateCheckInt32(len)) {
 			return false;

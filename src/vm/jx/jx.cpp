@@ -18,8 +18,8 @@
 #include "../i8253.h"
 #include "../i8255.h"
 #include "../i8259.h"
-//#include "../i286.h"
-#include "i286.h"
+//#include "../i86.h"
+#include "i86.h"
 #include "../io.h"
 #include "../memory.h"
 #include "../noise.h"
@@ -52,9 +52,15 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	pit = new I8253(this, emu);
 	pio = new I8255(this, emu);
 	pic = new I8259(this, emu);
-	cpu = new I286(this, emu);	// 8088
+	cpu = new I86(this, emu);
+//	cpu->device_model = INTEL_8088;
 	io = new IO(this, emu);
+	io->space = 0x10000;
+	io->bus_width = 8; // 8088
 	mem = new MEMORY(this, emu);
+	mem->space = 0x100000;
+	mem->bank_size = 0x4000;
+	mem->bus_width = 8; // 8088
 	pcm = new PCM1BIT(this, emu);
 	psg = new SN76489AN(this, emu);	// SN76496N
 	fdc = new UPD765A(this, emu);
@@ -345,7 +351,7 @@ void VM::update_config()
 	}
 }
 
-#define STATE_VERSION	1
+#define STATE_VERSION	2
 
 bool VM::process_state(FILEIO* state_fio, bool loading)
 {
@@ -353,8 +359,8 @@ bool VM::process_state(FILEIO* state_fio, bool loading)
 		return false;
 	}
 	for(DEVICE* device = first_device; device; device = device->next_device) {
-		const char *name = typeid(*device).name() + 6; // skip "class "
-		int len = strlen(name);
+		const _TCHAR *name = char_to_tchar(typeid(*device).name() + 6); // skip "class "
+		int len = (int)_tcslen(name);
 		
 		if(!state_fio->StateCheckInt32(len)) {
 			return false;

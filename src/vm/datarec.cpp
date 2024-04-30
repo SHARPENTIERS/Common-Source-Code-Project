@@ -132,9 +132,9 @@ void DATAREC::event_frame()
 		pcm_changed--;
 	}
 #ifdef DATAREC_SOUND
-	if(remote && (play || rec) && ff_rew == 0 && signal_changed > 10 && !config.sound_play_tape && sound_sample == 0) {
+	if(remote && (play || rec) && ff_rew == 0 && signal_changed > 10 && !config.sound_tape_signal && sound_sample == 0) {
 #else
-	if(remote && (play || rec) && ff_rew == 0 && signal_changed > 10 && !config.sound_play_tape) {
+	if(remote && (play || rec) && ff_rew == 0 && signal_changed > 10 && !config.sound_tape_signal) {
 #endif
 		request_skip_frames();
 	}
@@ -448,7 +448,7 @@ void DATAREC::update_event()
 
 void DATAREC::update_realtime_render()
 {
-	bool value = (remote && (play || rec) && ff_rew == 0 && config.sound_play_tape);
+	bool value = (remote && (play || rec) && ff_rew == 0 && (config.sound_tape_signal || config.sound_tape_voice));
 	
 	if(realtime != value) {
 		set_realtime_render(this, value);
@@ -731,7 +731,7 @@ int DATAREC::load_wav_image(int offset)
 					pair.b.h = tmp_buffer[tmp_ptr++]; \
 					sample[ch] = pair.s16; \
 				} else { \
-					sample[ch] = (tmp_buffer[tmp_ptr++] - 128) * 256; \
+					sample[ch] = ((int)tmp_buffer[tmp_ptr++] - 128) * 256; \
 				} \
 			} \
 			if(tmp_ptr == TMP_LENGTH) { \
@@ -1602,9 +1602,7 @@ int DATAREC::load_msx_cas_image()
 
 void DATAREC::mix(int32_t* buffer, int cnt)
 {
-	int32_t* buffer_tmp = buffer;
-	
-	if(config.sound_play_tape && pcm_changed && remote && (play || rec) && ff_rew == 0) {
+	if(config.sound_tape_signal && pcm_changed && remote && (play || rec) && ff_rew == 0) {
 		bool signal = ((play && in_signal) || (rec && out_signal));
 		if(signal) {
 			pcm_positive_clocks += get_passed_clock(pcm_prev_clock);
@@ -1618,14 +1616,14 @@ void DATAREC::mix(int32_t* buffer, int cnt)
 		pcm_last_vol_r = apply_volume(sample, pcm_volume_r);
 		
 		for(int i = 0; i < cnt; i++) {
-			*buffer++ += pcm_last_vol_l; // L
-			*buffer++ += pcm_last_vol_r; // R
+			buffer[i] += pcm_last_vol_l; // L
+			buffer[i] += pcm_last_vol_r; // R
 		}
 	} else if(pcm_last_vol_l || pcm_last_vol_r) {
 		// suppress petite noise when go to mute
 		for(int i = 0; i < cnt; i++) {
-			*buffer++ += pcm_last_vol_l; // L
-			*buffer++ += pcm_last_vol_r; // R
+			buffer[i] += pcm_last_vol_l; // L
+			buffer[i] += pcm_last_vol_r; // R
 			
 			if(pcm_last_vol_l > 0) {
 				pcm_last_vol_l--;
@@ -1643,19 +1641,18 @@ void DATAREC::mix(int32_t* buffer, int cnt)
 	pcm_positive_clocks = pcm_negative_clocks = 0;
 	
 #ifdef DATAREC_SOUND
-	if(/*config.sound_play_tape && */remote && play && ff_rew == 0) {
+	if(config.sound_tape_voice && remote && play && ff_rew == 0) {
 		sound_last_vol_l = apply_volume(sound_sample, sound_volume_l);
 		sound_last_vol_r = apply_volume(sound_sample, sound_volume_r);
-		buffer = buffer_tmp; // restore
 		for(int i = 0; i < cnt; i++) {
-			*buffer += sound_last_vol_l; // L
-			*buffer += sound_last_vol_r; // R
+			buffer[i] += sound_last_vol_l; // L
+			buffer[i] += sound_last_vol_r; // R
 		}
 	} else if(sound_last_vol_l || sound_last_vol_r) {
 		// suppress petite noise when go to mute
 		for(int i = 0; i < cnt; i++) {
-			*buffer++ += sound_last_vol_l; // L
-			*buffer++ += sound_last_vol_r; // R
+			buffer[i] += sound_last_vol_l; // L
+			buffer[i] += sound_last_vol_r; // R
 			
 			if(sound_last_vol_l > 0) {
 				sound_last_vol_l--;

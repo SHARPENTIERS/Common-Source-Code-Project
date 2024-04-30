@@ -55,6 +55,10 @@
 #define USE_AUTO_KEY		5
 #define USE_AUTO_KEY_RELEASE	6
 #define USE_AUTO_KEY_NO_CAPS
+#if defined(_MZ80K) || defined(_MZ1200)
+//#define USE_AUTO_KEY_NUMPAD
+#define USE_VM_AUTO_KEY_TABLE
+#endif
 #if defined(SUPPORT_MZ80AIF) || defined(SUPPORT_MZ80FIO)
 #define USE_SOUND_VOLUME	4
 #else
@@ -76,6 +80,34 @@
 #endif
 #if defined(_MZ1200)
 #define USE_MONITOR_TYPE	4
+#endif
+
+#if defined(_MZ80K) || defined(_MZ1200)
+static const int vm_auto_key_table_base[][2] = {
+	{0xa1,	0x200 | 0x74},	// '¡': KANA + F5
+	{0xa2,	0x200 | 0x70},	// '¢': KANA + F1
+	{0xa3,	0x200 | 0x71},	// '£': KANA + F2
+	{0xa4,	0x200 | 0x72},	// '¤': KANA + F3
+	{0xa5,	0x200 | 0x73},	// '¥': KANA + F4
+	{0xa6,	0x200 | 0xdb},	// '¦': KANA + '['
+	{0xa7,	0x200 | 0x6f},	// '§': KANA + NumPad '/'
+	{0xa8,	0x200 | 0x67},	// '¨': KANA + NumPad '7'
+	{0xa9,	0x200 | 0x64},	// '©': KANA + NumPad '4'
+	{0xaa,	0x200 | 0x61},	// 'ª': KANA + NumPad '1'
+	{0xab,	0x200 | 0x75},	// '«': KANA + F6
+	{0xac,	0x200 | 0xfa},	// '¬': KANA + NumPad '*'
+	{0xad,	0x200 | 0x68},	// '­': KANA + NumPad '8'
+	{0xae,	0x200 | 0x65},	// '®': KANA + NumPad '5'
+	{0xaf,	0x200 | 0x62},	// '¯': KANA + NumPad '2'
+	{0xb0,	0x200 | 0x76},	// '°': KANA + F7
+	{0xb9,	0x200 | 0xde},	// '¹': KANA + '^'
+	{0xcd,	0x200 | 0xc0},	// 'Í': KANA + '@'
+	{0xd1,	0x200 | 0xdc},	// 'Ñ': KANA + '\'
+	{0xdb,	0x200 | 0xba},	// 'Û': KANA + ':'
+	{0xde,	0x200 | 0xe2},	// 'Þ': KANA + '_'
+	{0xdf,	0x200 | 0xdd},	// 'ß': KANA + ']'
+	{-1,	-1},
+};
 #endif
 
 #include "../../common.h"

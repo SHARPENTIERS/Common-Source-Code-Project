@@ -23,6 +23,9 @@ class I386;
 #else
 class I286;
 #endif
+#if defined(HAS_SUB_V30)
+class I86;
+#endif
 
 class CPUREG : public DEVICE
 {
@@ -31,6 +34,10 @@ private:
 	I386 *d_cpu;
 #else
 	I286 *d_cpu;
+#endif
+#if defined(HAS_SUB_V30)
+	I86 *d_v30;
+	DEVICE *d_pio;
 #endif
 	bool nmi_enabled;
 	
@@ -45,6 +52,10 @@ public:
 	void reset();
 	void write_io8(uint32_t addr, uint32_t data);
 	uint32_t read_io8(uint32_t addr);
+#if defined(HAS_SUB_V30)
+	void set_intr_line(bool line, bool pending, uint32_t bit);
+	void set_extra_clock(int clock);
+#endif
 	bool process_state(FILEIO* state_fio, bool loading);
 	
 	// unique function
@@ -56,6 +67,17 @@ public:
 	{
 		d_cpu = device;
 	}
+#if defined(HAS_SUB_V30)
+	void set_context_v30(I86* device)
+	{
+		d_v30 = device;
+	}
+	void set_context_pio(DEVICE* device)
+	{
+		d_pio = device;
+	}
+	bool cpu_mode;
+#endif
 };
 
 #endif

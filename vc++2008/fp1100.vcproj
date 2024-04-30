@@ -932,7 +932,7 @@
 				</FileConfiguration>
 			</File>
 			<File
-				RelativePath="..\src\res\resource.h"
+				RelativePath="..\src\res\indicator\access_green.bmp"
 				>
 			</File>
 			<File
@@ -941,6 +941,10 @@
 			</File>
 			<File
 				RelativePath="..\src\res\indicator\access_on.bmp"
+				>
+			</File>
+			<File
+				RelativePath="..\src\res\resource.h"
 				>
 			</File>
 		</Filter>

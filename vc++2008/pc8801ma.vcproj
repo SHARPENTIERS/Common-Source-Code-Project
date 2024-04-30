@@ -650,6 +650,26 @@
 					</FileConfiguration>
 				</File>
 				<File
+					RelativePath="..\src\vm\pcm8bit.cpp"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+				</File>
+				<File
 					RelativePath="..\src\vm\prnfile.cpp"
 					>
 					<FileConfiguration
@@ -940,6 +960,26 @@
 				Filter="cpp"
 				>
 				<File
+					RelativePath="..\src\vm\pc8801\diskio.cpp"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+				</File>
+				<File
 					RelativePath="..\src\vm\pc8801\pc88.cpp"
 					>
 					<FileConfiguration
@@ -1068,6 +1108,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\src\vm\pcm8bit.h"
+					>
+				</File>
+				<File
 					RelativePath="..\src\vm\prnfile.h"
 					>
 				</File>
@@ -1157,6 +1201,10 @@
 				Filter="h"
 				>
 				<File
+					RelativePath="..\src\vm\pc8801\diskio.h"
+					>
+				</File>
+				<File
 					RelativePath="..\src\vm\pc8801\pc88.h"
 					>
 				</File>
@@ -1170,6 +1218,18 @@
 			Name="Resource Files"
 			Filter="ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe"
 			>
+			<File
+				RelativePath="..\src\res\indicator\access_green.bmp"
+				>
+			</File>
+			<File
+				RelativePath="..\src\res\indicator\access_off.bmp"
+				>
+			</File>
+			<File
+				RelativePath="..\src\res\indicator\access_on.bmp"
+				>
+			</File>
 			<File
 				RelativePath="..\src\res\pc8801ma.ico"
 				>
@@ -1198,14 +1258,6 @@
 			</File>
 			<File
 				RelativePath="..\src\res\resource.h"
-				>
-			</File>
-			<File
-				RelativePath="..\src\res\indicator\access_off.bmp"
-				>
-			</File>
-			<File
-				RelativePath="..\src\res\indicator\access_on.bmp"
 				>
 			</File>
 		</Filter>

@@ -20,6 +20,14 @@
 //#define DIRECTINPUT_VERSION	0x500
 #define DIRECTINPUT_VERSION	0x800
 
+#if defined(_MSC_VER) && (_MSC_VER >= 1910)
+#define SUPPORT_D2D1
+#endif
+
+#ifndef _UNITY			// MARU
+#define SUPPORT_D3D9
+#endif
+
 #include <windows.h>
 #include <windowsx.h>
 #include <mmsystem.h>
@@ -27,44 +35,58 @@
 #include <commctrl.h>
 #include <wingdi.h>
 #include <gdiplus.h>
+#ifdef SUPPORT_D2D1
+#include <d2d1.h>
+#endif
+#ifdef SUPPORT_D3D9
 #include <d3d9.h>
-#include <d3dx9.h>
+//#include <d3dx9.h>
 #include <d3d9types.h>
+#endif
 #include <vfw.h>
 #include <dsound.h>
 #include <dinput.h>
+#include <winsock.h>
 #include "../vm/vm.h"
 //#include "../emu.h"
 #include "../common.h"
 #include "../config.h"
 
-#ifdef USE_ZLIB
-// relative path from *.vcproj/*.vcxproj, not from this directory :-(
-	#if defined(_MSC_VER) && (_MSC_VER >= 1800)
+#if defined(USE_ZLIB) && !defined(USE_VCPKG)				// zlib not installed by vcpkg
+	// relative path from *.vcproj/*.vcxproj, not from this directory :-(
+	#ifdef _M_AMD64
+		// these zlibstat.lib were built with VC++2017 (thanks Marukun)
 		#ifdef _DEBUG
-			#pragma comment(lib, "../src/zlib-1.2.11/vc++2013/debug/zlibstat.lib")
+			#pragma comment(lib, "../src/zlib-1.2.11/debug/x64/zlibstat.lib")
 		#else
-			#pragma comment(lib, "../src/zlib-1.2.11/vc++2013/release/zlibstat.lib")
+			#pragma comment(lib, "../src/zlib-1.2.11/release/x64/zlibstat.lib")
 		#endif
 	#else
+		// these zlibstat.lib were built with VC++2008
 		#ifdef _DEBUG
-			#pragma comment(lib, "../src/zlib-1.2.11/vc++2008/debug/zlibstat.lib")
+			#pragma comment(lib, "../src/zlib-1.2.11/debug/zlibstat.lib")
 		#else
-			#pragma comment(lib, "../src/zlib-1.2.11/vc++2008/release/zlibstat.lib")
+			#pragma comment(lib, "../src/zlib-1.2.11/release/zlibstat.lib")
+		#endif
+		// for vsnprintf() and snprintf() in zlibstat.lib
+		#if defined(_MSC_VER) && (_MSC_VER >= 1900)
+			#pragma comment(lib, "legacy_stdio_definitions.lib")
 		#endif
 	#endif
 #endif
 
-#ifdef USE_SOCKET
-#include <winsock.h>
 #pragma comment(lib, "wsock32.lib")
-#endif
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "msimg32.lib")
 #pragma comment(lib, "gdiplus.lib")
 using namespace Gdiplus;
+#ifdef SUPPORT_D2D1
+#pragma comment(lib, "d2d1.lib")
+#endif
+#ifdef SUPPORT_D3D9
 #pragma comment(lib, "d3d9.lib")
-#pragma comment(lib, "d3dx9.lib")
+//#pragma comment(lib, "d3dx9.lib")
+#endif
 #pragma comment(lib, "vfw32.lib")
 #pragma comment(lib, "dsound.lib")
 #if DIRECTINPUT_VERSION >= 0x0800
@@ -152,7 +174,9 @@ public:
 #define MAX_CAPTURE_DEVS 8
 #endif
 
+#ifndef _M_AMD64
 #define SUPPORT_WIN32_DLL
+#endif
 
 #define SCREEN_FILTER_NONE	0
 #define SCREEN_FILTER_RGB	1
@@ -171,6 +195,9 @@ public:
 #endif
 
 // osd common
+
+class FIFO;
+class FILEIO;
 
 #define OSD_CONSOLE_BLUE	1 // text color contains blue
 #define OSD_CONSOLE_GREEN	2 // text color contains green
@@ -231,8 +258,13 @@ typedef struct {
 	int result;
 } rec_video_thread_param_t;
 
-class FIFO;
-class FILEIO;
+#ifdef USE_MIDI
+typedef struct midi_thread_params_s {
+	FIFO *send_buffer;
+	FIFO *recv_buffer;
+	bool terminate;
+} midi_thread_params_t;
+#endif
 
 class OSD
 {
@@ -240,7 +272,18 @@ private:
 	int lock_count;
 	
 	// console
+	void initialize_console();
+	void release_console();
+	
 	HANDLE hStdIn, hStdOut;
+	int console_count;
+	
+	void open_telnet(const _TCHAR* title);
+	void close_telnet();
+	void send_telnet(const char* buffer);
+	
+	bool use_telnet, telnet_closed;
+	int svr_socket, cli_socket;
 	
 	// input
 	void initialize_input();
@@ -311,11 +354,22 @@ private:
 	void rotate_screen_buffer(bitmap_t *source, bitmap_t *dest);
 //#endif
 	void stretch_screen_buffer(bitmap_t *source, bitmap_t *dest);
+#ifdef SUPPORT_D2D1
+	bool initialize_d2d1();
+	bool initialize_d2d1_surface(bitmap_t *buffer);
+	void release_d2d1();
+	void release_d2d1_surface();
+	void copy_to_d2d1_surface(bitmap_t *buffer);
+	void update_d2d1_screen(int dest_x, int dest_y);
+#endif
+#ifdef SUPPORT_D3D9
 	bool initialize_d3d9();
 	bool initialize_d3d9_surface(bitmap_t *buffer);
 	void release_d3d9();
 	void release_d3d9_surface();
 	void copy_to_d3d9_surface(bitmap_t *buffer);
+	void update_d3d9_screen(int dest_x, int dest_y);
+#endif
 	int add_video_frames();
 	
 	bitmap_t vm_screen_buffer;
@@ -328,6 +382,7 @@ private:
 //#endif
 	bitmap_t stretched_screen_buffer;
 	bitmap_t shrinked_screen_buffer;
+	bitmap_t reversed_screen_buffer;
 	bitmap_t video_screen_buffer;
 	
 	bitmap_t* draw_screen_buffer;
@@ -342,10 +397,19 @@ private:
 	Gdiplus::GdiplusStartupInput gdiSI;
 	ULONG_PTR gdiToken;
 	
+#ifdef SUPPORT_D2D1
+	ID2D1Factory* pD2d1Factory;
+	ID2D1DCRenderTarget *pD2d1DCRenderTarget;
+	ID2D1HwndRenderTarget* pD2d1HwndRenderTarget;
+	ID2D1Bitmap* pD2d1Bitmap;
+#endif
+#ifdef SUPPORT_D3D9
 	LPDIRECT3D9 lpd3d9;
 	LPDIRECT3DDEVICE9 lpd3d9Device;
 	LPDIRECT3DSURFACE9 lpd3d9Surface;
 	LPDIRECT3DSURFACE9 lpd3d9OffscreenSurface;
+	bool d3d9_device_lost;
+#endif
 	
 	_TCHAR video_file_path[_MAX_PATH];
 	int rec_video_fps;
@@ -426,12 +490,21 @@ private:
 	void initialize_socket();
 	void release_socket();
 	
-	int soc[SOCKET_MAX];
+	SOCKET soc[SOCKET_MAX];
 	bool is_tcp[SOCKET_MAX];
 	struct sockaddr_in udpaddr[SOCKET_MAX];
 	int socket_delay[SOCKET_MAX];
 	char recv_buffer[SOCKET_MAX][SOCKET_BUFFER_MAX];
 	int recv_r_ptr[SOCKET_MAX], recv_w_ptr[SOCKET_MAX];
+#endif
+	
+	//midi
+#ifdef USE_MIDI
+	void initialize_midi();
+	void release_midi();
+	
+	HANDLE hMidiThread;
+	midi_thread_params_t midi_thread_params;
 #endif
 	
 public:
@@ -466,14 +539,14 @@ public:
 #endif
 	
 	// common console
-	void open_console(const _TCHAR* title);
+	void open_console(int width, int height, const _TCHAR* title);
 	void close_console();
 	unsigned int get_console_code_page();
-	bool is_console_active();
 	void set_console_text_attribute(unsigned short attr);
 	void write_console(const _TCHAR* buffer, unsigned int length);
 	int read_console_input(_TCHAR* buffer, unsigned int length);
 	bool is_console_key_pressed(int vk);
+	bool is_console_closed();
 	void close_debugger_console();
 	
 	// common input
@@ -564,6 +637,9 @@ public:
 	void stop_record_sound();
 	void restart_record_sound();
 	bool now_record_sound;
+#ifdef _UNITY	// MARU
+	int16_t	* get_sound_buffer();
+#endif // !_UNITY
 	
 	// common video device
 #if defined(USE_MOVIE_PLAYER) || defined(USE_VIDEO_CAPTURE)
@@ -629,7 +705,7 @@ public:
 	
 	// common socket
 #ifdef USE_SOCKET
-	int get_socket(int ch)
+	SOCKET get_socket(int ch)
 	{
 		return soc[ch];
 	}
@@ -645,6 +721,12 @@ public:
 	void send_socket_data_udp(int ch, uint32_t ipaddr, int port);
 	void send_socket_data(int ch);
 	void recv_socket_data(int ch);
+#endif
+	
+	// common midi
+#ifdef USE_MIDI
+	void send_to_midi(uint8_t data);
+	bool recv_from_midi(uint8_t *data);
 #endif
 	
 	// win32 dependent

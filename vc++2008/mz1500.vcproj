@@ -875,6 +875,26 @@
 					</FileConfiguration>
 				</File>
 				<File
+					RelativePath="..\src\vm\mz700\joystick.cpp"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+				</File>
+				<File
 					RelativePath="..\src\vm\mz700\kanji.cpp"
 					>
 					<FileConfiguration
@@ -1160,6 +1180,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\src\vm\mz700\joystick.h"
+					>
+				</File>
+				<File
 					RelativePath="..\src\vm\mz700\kanji.h"
 					>
 				</File>
@@ -1194,6 +1218,18 @@
 			Filter="ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe"
 			>
 			<File
+				RelativePath="..\src\res\indicator\access_green.bmp"
+				>
+			</File>
+			<File
+				RelativePath="..\src\res\indicator\access_off.bmp"
+				>
+			</File>
+			<File
+				RelativePath="..\src\res\indicator\access_on.bmp"
+				>
+			</File>
+			<File
 				RelativePath="..\src\res\mz1500.ico"
 				>
 			</File>
@@ -1221,14 +1257,6 @@
 			</File>
 			<File
 				RelativePath="..\src\res\resource.h"
-				>
-			</File>
-			<File
-				RelativePath="..\src\res\indicator\access_off.bmp"
-				>
-			</File>
-			<File
-				RelativePath="..\src\res\indicator\access_on.bmp"
 				>
 			</File>
 		</Filter>

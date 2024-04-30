@@ -14,10 +14,6 @@
 #include "../emu.h"
 #include "device.h"
 
-/*
-	NOTE: I8259_MAX_CHIPS shoud be 1 or 2
-*/
-
 #define SIG_I8259_IR0	0
 #define SIG_I8259_IR1	1
 #define SIG_I8259_IR2	2
@@ -28,13 +24,13 @@
 #define SIG_I8259_IR7	7
 #define SIG_I8259_CHIP0	0
 #define SIG_I8259_CHIP1	8
-//#define SIG_I8259_CHIP2	16
-//#define SIG_I8259_CHIP3	24
+#define SIG_I8259_CHIP2	16
+#define SIG_I8259_CHIP3	24
 
 #define I8259_ADDR_CHIP0	0
 #define I8259_ADDR_CHIP1	2
-//#define I8259_ADDR_CHIP2	4
-//#define I8259_ADDR_CHIP3	6
+#define I8259_ADDR_CHIP2	4
+#define I8259_ADDR_CHIP3	6
 
 class I8259 : public DEVICE
 {
@@ -46,16 +42,15 @@ private:
 		uint8_t icw1, icw2, icw3, icw4, ocw3;
 		uint8_t icw2_r, icw3_r, icw4_r;
 		int irr_tmp_id;
-	} pic[I8259_MAX_CHIPS];
+	} pic[4];
 	int req_chip, req_level;
 	uint8_t req_bit;
-	
-	void update_intr();
 	
 public:
 	I8259(VM_TEMPLATE* parent_vm, EMU* parent_emu) : DEVICE(parent_vm, parent_emu)
 	{
 		d_cpu = NULL;
+		num_chips = 1;
 		set_device_name(_T("8259 PIC"));
 	}
 	~I8259() {}
@@ -76,13 +71,15 @@ public:
 		// request from Z80 familly
 		write_signal(bit, line ? 1 : 0, 1);
 	}
+	void update_intr();
 	uint32_t get_intr_ack();
 	
-	// unique functions
+	// unique function
 	void set_context_cpu(DEVICE* device)
 	{
 		d_cpu = device;
 	}
+	int num_chips;
 };
 
 #endif

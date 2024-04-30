@@ -108,8 +108,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <io.h>
+#include <math.h>
 #ifdef _MSC_VER
-	#include <typeinfo.h>
+	#if _MSC_VER < 1920
+		#include <typeinfo.h>
+	#else
+		#include <vcruntime_typeinfo.h>
+	#endif
 #else
 	#include <typeinfo>
 #endif
@@ -265,7 +270,7 @@
 	#endif
 #endif
 
-typedef union {
+typedef union pair16_u {
 	struct {
 #ifdef __BIG_ENDIAN__
 		uint8_t h, l;
@@ -346,7 +351,7 @@ typedef union {
 	}
 } pair16_t;
 
-typedef union {
+typedef union pair32_u {
 	struct {
 #ifdef __BIG_ENDIAN__
 		uint8_t h3, h2, h, l;
@@ -503,7 +508,7 @@ typedef union {
 	}
 } pair32_t;
 
-typedef union {
+typedef union pair64_u {
 	struct {
 #ifdef __BIG_ENDIAN__
 		uint8_t h7, h6, h5, h4, h3, h2, h, l;
@@ -976,6 +981,22 @@ int16_t DLL_PREFIX ExchangeEndianS16(uint16_t x);
 	#define A_OF_COLOR(c)		(((c) >> 24) & 0xff)
 #endif
 
+// 20181104 K.O:
+// Below routines aim to render common routine.
+
+#ifdef _MSC_VER
+	#define __DECL_ALIGNED(foo) __declspec(align(foo))
+	#ifndef __builtin_assume_aligned
+		#define __builtin_assume_aligned(foo, a) foo
+	#endif
+#elif defined(__GNUC__)
+	#define __DECL_ALIGNED(foo) __attribute__((aligned(foo)))
+#else
+	// ToDo
+	#define __builtin_assume_aligned(foo, a) foo
+	#define __DECL_ALIGNED(foo)
+#endif
+
 // wav file header
 #pragma pack(1)
 typedef struct {
@@ -1003,6 +1024,8 @@ const _TCHAR *DLL_PREFIX get_application_path();
 const _TCHAR *DLL_PREFIX get_initial_current_path();
 const _TCHAR *DLL_PREFIX create_local_path(const _TCHAR *format, ...);
 void DLL_PREFIX create_local_path(_TCHAR *file_path, int length, const _TCHAR *format, ...);
+const _TCHAR *DLL_PREFIX create_absolute_path(const _TCHAR *format, ...);
+void DLL_PREFIX create_absolute_path(_TCHAR *file_path, int length, const _TCHAR *format, ...);
 bool DLL_PREFIX is_absolute_path(const _TCHAR *file_path);
 const _TCHAR *DLL_PREFIX create_date_file_path(const _TCHAR *extension);
 void DLL_PREFIX create_date_file_path(_TCHAR *file_path, int length, const _TCHAR *extension);
@@ -1051,6 +1074,7 @@ typedef DLL_PREFIX struct cur_time_s {
 	bool initialized;
 	cur_time_s()
 	{
+		year = month = day = day_of_week = hour = minute = second = 0;
 		initialized = false;
 	}
 	void increment();

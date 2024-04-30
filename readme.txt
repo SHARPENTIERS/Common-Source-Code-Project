@@ -1,5 +1,5 @@
 retro pc emulator common source code
-								4/30/2019
+								12/31/2023
 
 --- What's this ?
 
@@ -12,14 +12,18 @@ This archive includes the all source codes of emulators listed below:
 	BANDAI
 		eRX-78		RX-78
 	CANON
+		eBX-1		BX-1
 		eX-07		X-07
 	CASIO
 		eFP-200		FP-200
 		eFP-1100	FP-1100
+		eFX-9000P	FX-9000P
 		ePV-1000	PV-1000
 		EmuGaki		PV-2000
 	COLECO
 		yaCOLECOVISION	ColecoVision
+	Computer Research
+		eCRC-80		CRC-80
 	EPOCH
 		eSCV		Super Cassette Vision
 	EPSON
@@ -27,6 +31,8 @@ This archive includes the all source codes of emulators listed below:
 		eHC-40		HC-40/PX-4
 		eHC-80		HC-80/PX-8/Geneva
 		eQC-10		QC-10 / QX-10
+	ESP
+		eTRNJunior	TRN Junior
 	FUJITSU
 		eFM8		FM-8 (by Mr.Artane.)
 		eFM7		FM-7 (by Mr.Artane.)
@@ -42,6 +48,8 @@ This archive includes the all source codes of emulators listed below:
 		eFMR-60		FMR-60
 		eFMR-70		FMR-70
 		eFMR-80		FMR-80
+	GAKKEN
+		yaTVBOY		TV BOY (by Mr.tanam)
 	Gijutsu Hyoron Sha
 		eBabbage-2nd	Babbage-2nd
 	HITACHI
@@ -54,6 +62,8 @@ This archive includes the all source codes of emulators listed below:
 		eJX		PC/JX
 	Japan Electronics College
 		eMYCOMZ-80A	MYCOMZ-80A
+	MITEC
+		eMP-85		MP-85
 	MITSUBISHI Electric
 		EmuLTI8		MULTI8
 	National/Panasonic
@@ -95,6 +105,8 @@ This archive includes the all source codes of emulators listed below:
 		ePCEngine	PC Engine / SuperGrafx + CD-ROM^2
 	Nintendo
 		eFamilyBASIC	Family BASIC
+	Nippon Mail Service
+		eMuCom Mahjong	MICOM MAHJONG (by Mr.GORRY)
 	Pioneer
 		ePX-7		PX-7 (MSX1 + LaserDisc)
 	SANYO
@@ -132,18 +144,22 @@ This archive includes the all source codes of emulators listed below:
 		eSMC-70		SMC-70
 		eSMC-777	SMC-777
 	SORD
+		Emu23		M23
 		Emu5		m5
+	SPECTRAVIDEO
+		yaSVI-3x8	SVI-3x8 (by Mr.tanam)
 	Systems Formulate
 		eBUBCOM80	BUBCOM80
 	TOMY
 		ePyuTa		PyuTa/PyuTa Jr.
 	TOSHIBA
-		eEX-80		EX-80
+		eEX-80BS	EX-80BS
 		yayaHX-20+	HX-20 + FDD (by Mr.umaiboux)
 		EmuPIA		PASOPIA/PASOPIA5
 		EmuPIA7		PASOPIA7
 		eJ-3100GT	J-3100GT (work in progress)
 		eJ-3100SL	J-3100SL (work in progress)
+		eT-250		T-250
 	YAMAHA
 		eYIS		YIS
 	Yuasa Kyouiku System
@@ -153,7 +169,7 @@ This archive includes the all source codes of emulators listed below:
 --- How to build
 
 Build the projects with the Microsoft Visual C++ 2008 with Service Pack 1 or
-the Microsoft Visual C++ 2013 with Update 5.
+the Microsoft Visual C++ 2017.
 
 The DirectX SDK is required.
 I recommend the DirectX 9.0 SDK Update (December 2004),
@@ -166,13 +182,7 @@ the definition of DIRECTINPUT_VERSION from 0x500 to 0x800 as follows:
 //#define DIRECTINPUT_VERSION	0x500
 #define DIRECTINPUT_VERSION	0x800
 
-When you use the Microsoft Visual C++ 2008 with Service Pack 1,
-the Windows SDK for Windows 8.1 is also required to get the mt.exe utility.
-The mt.exe is used to merge a manifest file for Windows Vista or later.
-
-https://msdn.microsoft.com/en-us/windows/desktop/bg162891.aspx
-
-When you use the Microsoft Visual C++ 2013 with Update 5, the dir macros,
+When you use the Microsoft Visual C++ 2017, the dir macros,
 WindowsSDK_IncludePath, WindowsSDK_LibraryPath_x86, and DXSDK_DIR shoud be
 defined and should specifies the install directories of the Windows SDK
 and the DirectX SDK.
@@ -213,6 +223,8 @@ See also COPYING.txt for more details about the license.
 	MAME i286 core
 - vm/i386.*
 	MAME i386 core
+- vm/i386_np21.*
+	Neko Project 21/W i386 core
 - vm/i8259.*
 	Neko Project 2 and MESS 8259 core
 - vm/ld700.*
@@ -227,6 +239,8 @@ See also COPYING.txt for more details about the license.
 	MAME mc6809 core and improved by Mr.Artane.
 - vm/mc6840.*
 	MAME Motorola 6840 (PTM) by Mr.James Wallace
+- vm/mc6843.*
+	MAME Motorola 6843 (FDC) by Mr.Antoine Mine
 - vm/mc6847.*
 	MAME mc6847 core
 - vm/msm5205.*
@@ -311,6 +325,8 @@ See also COPYING.txt for more details about the license.
 - vm/m5/*
 	MESS sord driver
 	Mr.Moriya for Sord M5 hardware design info
+- vm/micom_mahjong/*
+	eMuCom Mahjong by Mr.GORRY
 - vm/msx/*
 	yaMSX1 and yaMSX2 by Mr.tanam
 - vm/msx/memory.*
@@ -324,6 +340,9 @@ See also COPYING.txt for more details about the license.
 	Mr.Enri for SHARP MZ-80FIO and MZ-80FD hardware design info
 - vm/mz80k/printer.*
 	The printer interface by Mr.Suga
+- vm/mz700/quickdisk.*
+	Improved for QDF format by Mr.kitahei88
+	Improved for BSD record by Mr.Yuushi and Mr.Motochan1500
 - vm/mz2500/sasi.*
 	X millenium by Mr.Punyu
 - vm/mz3500/keyboard.*
@@ -332,12 +351,13 @@ See also COPYING.txt for more details about the license.
 - vm/pc6001/*
 	yaPC-6001/yaPC-6201/yaPC-6601 by Mr.tanam
 - vm/pc8801/pc88.*
-	M88 by Mr.CISC
+	M88/cdif/diskdrv by Mr.CISC
 	XM8 by Mr.PI.
 	X88000 by Mr.Manuke
 	MESS PC-8801 driver
 - vm/pc9801/display.*
 	Neko Project 2 by Mr.Yui
+	Improved for EGC by Mr.Ryuji Okamoto (qemu/9821‰ü‘¢”Å)
 - vm/pcengine/pce.*
 	Ootake (joypad)
 	xpce (psg)
@@ -355,6 +375,10 @@ See also COPYING.txt for more details about the license.
 	Mr.Fred Han Kraan for EPSON QC-10/QX-10 hardware design info
 - vm/scv/*
 	Mr.Enri and Mr.333 for Epoch Super Cassette Vision hardware info
+- vm/svi3x8/*
+	yaSVI-3x8 by Mr.tanam
+- vm/tvboy/*
+	yaTVBOY by Mr.tanam
 - vm/x07/io.*
 	x07_emul by Mr.Jacques Brigaud
 - vm/x1/*
@@ -364,6 +388,8 @@ See also COPYING.txt for more details about the license.
 - vm/x1/display.*
 	KANJI ROM support by X1EMU
 	X1tuboZ graphic info by Mr.Sato
+- vm/x1/cz8rb.*
+	CZ-8RB ROM board support by Mr.Meister
 - vm/yis/*
 	YAMAHA provided me some YIS manuals and software disks
 	Mr.Moriya analyzed the YIS hardware

@@ -25,12 +25,13 @@ private:
 	struct {
 		uint8_t control;
 		bool slope;
-		uint16_t count;
+		int16_t count;
 		uint16_t constant;
 		uint8_t vector;
 		int clocks;
 		int prescaler;
 		bool freeze;
+		bool freezed;
 		bool start;
 		bool latch;
 		bool prev_in;
@@ -41,6 +42,7 @@ private:
 		int sysclock_id;
 		uint32_t input;
 		uint32_t period;
+		double remain;
 		uint32_t prev;
 		// interrupt
 		bool req_intr;
@@ -115,6 +117,11 @@ public:
 	}
 	void set_context_zc2(DEVICE* device, int id, uint32_t mask)
 	{
+		register_output_signal(&counter[2].outputs, device, id, mask);
+	}
+	void set_context_zc3(DEVICE* device, int id, uint32_t mask)
+	{
+		// TMPZ84C015/TMPZ84C013 has ZC/TO3 pin
 		register_output_signal(&counter[2].outputs, device, id, mask);
 	}
 	void set_constant_clock(int ch, uint32_t hz)

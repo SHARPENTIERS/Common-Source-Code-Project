@@ -11,6 +11,9 @@
 #include <string>
 #endif
 #include "emu.h"
+#if defined(USE_DEBUGGER)
+#include "vm/debugger.h"
+#endif
 #include "vm/vm.h"
 #include "fifo.h"
 #include "fileio.h"
@@ -78,6 +81,9 @@ EMU::EMU()
 #endif
 #ifdef USE_PRINTER_TYPE
 	printer_type = config.printer_type;
+#endif
+#ifdef USE_SERIAL_TYPE
+	serial_type = config.serial_type;
 #endif
 	
 	// initialize osd
@@ -195,6 +201,37 @@ bool EMU::is_frame_skippable()
 
 int EMU::run()
 {
+#if defined(USE_DEBUGGER) && defined(USE_STATE)
+	if(request_save_state >= 0 || request_load_state >= 0) {
+		if(request_save_state >= 0) {
+			save_state(state_file_path(request_save_state));
+		} else {
+			load_state(state_file_path(request_load_state));
+		}
+		// NOTE: vm instance may be reinitialized in load_state
+		if(!is_debugger_enabled(debugger_cpu_index)) {
+			for(int i = 0; i < 8; i++) {
+				if(is_debugger_enabled(i)) {
+					debugger_cpu_index = i;
+					debugger_target_id = vm->get_cpu(debugger_cpu_index)->this_device_id;
+					break;
+				}
+			}
+		}
+		if(is_debugger_enabled(debugger_cpu_index)) {
+			if(!(vm->get_device(debugger_target_id) != NULL && vm->get_device(debugger_target_id)->get_debugger() != NULL)) {
+				debugger_target_id = vm->get_cpu(debugger_cpu_index)->this_device_id;
+			}
+			DEBUGGER *cpu_debugger = (DEBUGGER *)vm->get_cpu(debugger_cpu_index)->get_debugger();
+			cpu_debugger->now_going = false;
+			cpu_debugger->now_debugging = true;
+			debugger_thread_param.vm = vm;
+		} else {
+			close_debugger();
+		}
+		request_save_state = request_load_state = -1;
+	}
+#endif
 	if(now_suspended) {
 		osd->restore();
 		now_suspended = false;
@@ -253,6 +290,10 @@ void EMU::reset()
 #ifdef USE_PRINTER_TYPE
 	reinitialize |= (printer_type != config.printer_type);
 	printer_type = config.printer_type;
+#endif
+#ifdef USE_SERIAL_TYPE
+	reinitialize |= (serial_type != config.serial_type);
+	serial_type = config.serial_type;
 #endif
 	if(reinitialize) {
 		// stop sound
@@ -1246,7 +1287,8 @@ void EMU::set_auto_key_char(char code)
 			return;
 		}
 		for(int i = 0;; i++) {
-			int len = strlen(romaji_table[i].romaji), comp = -1;
+			size_t len = strlen(romaji_table[i].romaji);
+			int comp = -1;
 			if(len == 0) {
 				// end of table
 				if(!is_alphabet(codes[3])) {
@@ -1753,7 +1795,7 @@ void EMU::write_bitmap_to_file(bitmap_t *bitmap, const _TCHAR *file_path)
 // ----------------------------------------------------------------------------
 
 #ifdef USE_SOCKET
-int EMU::get_socket(int ch)
+SOCKET EMU::get_socket(int ch)
 {
 	return osd->get_socket(ch);
 }
@@ -1811,6 +1853,22 @@ void EMU::send_socket_data(int ch)
 void EMU::recv_socket_data(int ch)
 {
 	osd->recv_socket_data(ch);
+}
+#endif
+
+// ----------------------------------------------------------------------------
+// socket
+// ----------------------------------------------------------------------------
+
+#ifdef USE_MIDI
+void EMU::send_to_midi(uint8_t data)
+{
+	osd->send_to_midi(data);
+}
+
+bool EMU::recv_from_midi(uint8_t *data)
+{
+	return osd->recv_from_midi(data);
 }
 #endif
 
@@ -2219,7 +2277,7 @@ bool EMU::is_cart_inserted(int drv)
 #endif
 
 #ifdef USE_FLOPPY_DISK
-void EMU::create_bank_floppy_disk(const _TCHAR* file_path, uint8_t type)
+bool EMU::create_blank_floppy_disk(const _TCHAR* file_path, uint8_t type)
 {
 	/*
 		type: 0x00 = 2D, 0x10 = 2DD, 0x20 = 2HD
@@ -2244,11 +2302,46 @@ void EMU::create_bank_floppy_disk(const _TCHAR* file_path, uint8_t type)
 		fio->Fclose();
 	}
 	delete fio;
+	return true;
 }
 
 void EMU::open_floppy_disk(int drv, const _TCHAR* file_path, int bank)
 {
 	if(drv < USE_FLOPPY_DISK) {
+		d88_file[drv].bank_num = 0;
+		d88_file[drv].cur_bank = -1;
+		
+		if(check_file_extension(file_path, _T(".d88")) || check_file_extension(file_path, _T(".d8e")) ||
+		   check_file_extension(file_path, _T(".d77")) || check_file_extension(file_path, _T(".1dd"))) {
+			FILEIO *fio = new FILEIO();
+			if(fio->Fopen(file_path, FILEIO_READ_BINARY)) {
+				try {
+					fio->Fseek(0, FILEIO_SEEK_END);
+					uint32_t file_size = fio->Ftell(), file_offset = 0;
+					while(file_offset + 0x2b0 <= file_size && d88_file[drv].bank_num < MAX_D88_BANKS) {
+						fio->Fseek(file_offset, FILEIO_SEEK_SET);
+#ifdef _UNICODE
+						char tmp[18];
+						fio->Fread(tmp, 17, 1);
+						tmp[17] = 0;
+						MultiByteToWideChar(CP_ACP, 0, tmp, -1, d88_file[drv].disk_name[d88_file[drv].bank_num], 18);
+#else
+						fio->Fread(d88_file[drv].disk_name[d88_file[drv].bank_num], 17, 1);
+						d88_file[drv].disk_name[d88_file[drv].bank_num][17] = 0;
+#endif
+						fio->Fseek(file_offset + 0x1c, SEEK_SET);
+						file_offset += fio->FgetUint32_LE();
+						d88_file[drv].bank_num++;
+					}
+					my_tcscpy_s(d88_file[drv].path, _MAX_PATH, file_path);
+					d88_file[drv].cur_bank = bank;
+				} catch(...) {
+					d88_file[drv].bank_num = 0;
+				}
+				fio->Fclose();
+			}
+			delete fio;
+		}
 		if(vm->is_floppy_disk_inserted(drv)) {
 			vm->close_floppy_disk(drv);
 			// wait 0.5sec
@@ -2274,6 +2367,9 @@ void EMU::open_floppy_disk(int drv, const _TCHAR* file_path, int bank)
 void EMU::close_floppy_disk(int drv)
 {
 	if(drv < USE_FLOPPY_DISK) {
+		d88_file[drv].bank_num = 0;
+		d88_file[drv].cur_bank = -1;
+		
 		vm->close_floppy_disk(drv);
 		clear_media_status(&floppy_disk_status[drv]);
 #if USE_FLOPPY_DISK > 1
@@ -2281,6 +2377,15 @@ void EMU::close_floppy_disk(int drv)
 #else
 		out_message(_T("FD: Ejected"));
 #endif
+	}
+}
+
+bool EMU::is_floppy_disk_connected(int drv)
+{
+	if(drv < USE_FLOPPY_DISK) {
+		return vm->is_floppy_disk_connected(drv);
+	} else {
+		return false;
 	}
 }
 
@@ -2312,6 +2417,11 @@ bool EMU::is_floppy_disk_protected(int drv)
 uint32_t EMU::is_floppy_disk_accessed()
 {
 	return vm->is_floppy_disk_accessed();
+}
+
+uint32_t EMU::floppy_disk_indicator_color()
+{
+	return vm->floppy_disk_indicator_color();
 }
 #endif
 
@@ -2362,6 +2472,15 @@ bool EMU::is_quick_disk_inserted(int drv)
 	}
 }
 
+bool EMU::is_quick_disk_connected(int drv)
+{
+	if(drv < USE_QUICK_DISK) {
+		return vm->is_quick_disk_connected(drv);
+	} else {
+		return false;
+	}
+}
+
 uint32_t EMU::is_quick_disk_accessed()
 {
 	return vm->is_quick_disk_accessed();
@@ -2369,6 +2488,92 @@ uint32_t EMU::is_quick_disk_accessed()
 #endif
 
 #ifdef USE_HARD_DISK
+bool EMU::create_blank_hard_disk(const _TCHAR* file_path, int sector_size, int sectors, int surfaces, int cylinders)
+{
+	if(check_file_extension(file_path, _T(".nhd"))) {
+		// T98-Next
+		const char sig_nhd[] = "T98HDDIMAGE.R0";
+		typedef struct nhd_header_s {
+			char sig[16];
+			char comment[256];
+			int32_t header_size;	// +272
+			int32_t cylinders;	// +276
+			int16_t surfaces;	// +280
+			int16_t sectors;	// +282
+			int16_t sector_size;	// +284
+			uint8_t reserved[0xe2];
+		} nhd_header_t;
+		nhd_header_t header;
+		
+		memset(&header, 0, sizeof(header));
+		strcpy(header.sig, "T98HDDIMAGE.R0");
+		header.header_size = sizeof(header);
+		header.cylinders = cylinders;
+		header.surfaces = surfaces;
+		header.sectors = sectors;
+		header.sector_size = sector_size;
+		
+		FILEIO *fio = new FILEIO();
+		if(fio->Fopen(file_path, FILEIO_WRITE_BINARY)) {
+			fio->Fwrite(&header, sizeof(header), 1);
+			void *empty = calloc(sector_size, 1);
+#if 0
+			fio->Fwrite(empty, sector_size, sectors * surfaces * cylinders);
+#else
+			for(int i = 0; i < sectors * surfaces * cylinders; i++) {
+				fio->Fwrite(empty, sector_size, 1);
+			}
+#endif
+			free(empty);
+			fio->Fclose();
+		}
+		delete fio;
+		return true;
+	} else if(check_file_extension(file_path, _T(".hdi"))) {
+		// ANEX86
+		typedef struct hdi_header_s {
+			int32_t dummy;		// + 0
+			int32_t hdd_type;	// + 4
+			int32_t header_size;	// + 8
+			int32_t hdd_size;	// +12
+			int32_t sector_size;	// +16
+			int32_t sectors;	// +20
+			int32_t surfaces;	// +24
+			int32_t cylinders;	// +28
+			uint8_t padding[0x1000 - sizeof(int32_t) * 8];
+		} hdi_header_t;
+		hdi_header_t header;
+		
+		memset(&header, 0, sizeof(header));
+		header.hdd_type = 0; // ???
+		header.header_size = sizeof(header);
+		header.hdd_size = sector_size * sectors * surfaces * cylinders;
+		header.sector_size = sector_size;
+		header.sectors = sectors;
+		header.surfaces = surfaces;
+		header.cylinders = cylinders;
+		
+		FILEIO *fio = new FILEIO();
+		if(fio->Fopen(file_path, FILEIO_WRITE_BINARY)) {
+			fio->Fwrite(&header, sizeof(header), 1);
+			void *empty = calloc(sector_size, 1);
+#if 0
+			fio->Fwrite(empty, sector_size, sectors * surfaces * cylinders);
+#else
+			for(int i = 0; i < sectors * surfaces * cylinders; i++) {
+				fio->Fwrite(empty, sector_size, 1);
+			}
+#endif
+			free(empty);
+			fio->Fclose();
+		}
+		delete fio;
+		return true;
+	}
+	// unknown extension
+	return false;
+}
+
 void EMU::open_hard_disk(int drv, const _TCHAR* file_path)
 {
 	if(drv < USE_HARD_DISK) {
@@ -2578,40 +2783,48 @@ void EMU::push_apss_rewind(int drv)
 #ifdef USE_COMPACT_DISC
 void EMU::open_compact_disc(int drv, const _TCHAR* file_path)
 {
-	if(vm->is_compact_disc_inserted(drv)) {
+	if(drv < USE_COMPACT_DISC) {
+		if(vm->is_compact_disc_inserted(drv)) {
+			vm->close_compact_disc(drv);
+			// wait 0.5sec
+			compact_disc_status[drv].wait_count = (int)(vm->get_frame_rate() / 2);
+#if USE_COMPACT_DISC > 1
+			out_message(_T("CD%d: Ejected"), drv + BASE_COMPACT_DISC_NUM);
+#else
+			out_message(_T("CD: Ejected"));
+#endif
+		} else if(compact_disc_status[drv].wait_count == 0) {
+			vm->open_compact_disc(drv, file_path);
+#if USE_COMPACT_DISC > 1
+			out_message(_T("CD%d: %s"), drv + BASE_COMPACT_DISC_NUM, file_path);
+#else
+			out_message(_T("CD: %s"), file_path);
+#endif
+		}
+		my_tcscpy_s(compact_disc_status[drv].path, _MAX_PATH, file_path);
+	}
+}
+
+void EMU::close_compact_disc(int drv)
+{
+	if(drv < USE_COMPACT_DISC) {
 		vm->close_compact_disc(drv);
-		// wait 0.5sec
-		compact_disc_status[drv].wait_count = (int)(vm->get_frame_rate() / 2);
+		clear_media_status(&compact_disc_status[drv]);
 #if USE_COMPACT_DISC > 1
 		out_message(_T("CD%d: Ejected"), drv + BASE_COMPACT_DISC_NUM);
 #else
 		out_message(_T("CD: Ejected"));
 #endif
-	} else if(compact_disc_status[drv].wait_count == 0) {
-		vm->open_compact_disc(drv, file_path);
-#if USE_COMPACT_DISC > 1
-		out_message(_T("CD%d: %s"), drv + BASE_COMPACT_DISC_NUM, file_path);
-#else
-		out_message(_T("CD: %s"), file_path);
-#endif
 	}
-	my_tcscpy_s(compact_disc_status[drv].path, _MAX_PATH, file_path);
-}
-
-void EMU::close_compact_disc(int drv)
-{
-	vm->close_compact_disc(drv);
-	clear_media_status(&compact_disc_status[drv]);
-#if USE_COMPACT_DISC > 1
-	out_message(_T("CD%d: Ejected"), drv + BASE_COMPACT_DISC_NUM);
-#else
-	out_message(_T("CD: Ejected"));
-#endif
 }
 
 bool EMU::is_compact_disc_inserted(int drv)
 {
-	return vm->is_compact_disc_inserted(drv);
+	if(drv < USE_COMPACT_DISC) {
+		return vm->is_compact_disc_inserted(drv);
+	} else {
+		return false;
+	}
 }
 
 uint32_t EMU::is_compact_disc_accessed()
@@ -2623,40 +2836,48 @@ uint32_t EMU::is_compact_disc_accessed()
 #ifdef USE_LASER_DISC
 void EMU::open_laser_disc(int drv, const _TCHAR* file_path)
 {
-	if(vm->is_laser_disc_inserted(drv)) {
+	if(drv < USE_LASER_DISC) {
+		if(vm->is_laser_disc_inserted(drv)) {
+			vm->close_laser_disc(drv);
+			// wait 0.5sec
+			laser_disc_status[drv].wait_count = (int)(vm->get_frame_rate() / 2);
+#if USE_LASER_DISC > 1
+			out_message(_T("LD%d: Ejected"), drv + BASE_LASER_DISC_NUM);
+#else
+			out_message(_T("LD: Ejected"));
+#endif
+		} else if(laser_disc_status[drv].wait_count == 0) {
+			vm->open_laser_disc(drv, file_path);
+#if USE_LASER_DISC > 1
+			out_message(_T("LD%d: %s"), drv + BASE_LASER_DISC_NUM, file_path);
+#else
+			out_message(_T("LD: %s"), file_path);
+#endif
+		}
+		my_tcscpy_s(laser_disc_status[drv].path, _MAX_PATH, file_path);
+	}
+}
+
+void EMU::close_laser_disc(int drv)
+{
+	if(drv < USE_LASER_DISC) {
 		vm->close_laser_disc(drv);
-		// wait 0.5sec
-		laser_disc_status[drv].wait_count = (int)(vm->get_frame_rate() / 2);
+		clear_media_status(&laser_disc_status[drv]);
 #if USE_LASER_DISC > 1
 		out_message(_T("LD%d: Ejected"), drv + BASE_LASER_DISC_NUM);
 #else
 		out_message(_T("LD: Ejected"));
 #endif
-	} else if(laser_disc_status[drv].wait_count == 0) {
-		vm->open_laser_disc(drv, file_path);
-#if USE_LASER_DISC > 1
-		out_message(_T("LD%d: %s"), drv + BASE_LASER_DISC_NUM, file_path);
-#else
-		out_message(_T("LD: %s"), file_path);
-#endif
 	}
-	my_tcscpy_s(laser_disc_status[drv].path, _MAX_PATH, file_path);
-}
-
-void EMU::close_laser_disc(int drv)
-{
-	vm->close_laser_disc(drv);
-	clear_media_status(&laser_disc_status[drv]);
-#if USE_LASER_DISC > 1
-	out_message(_T("LD%d: Ejected"), drv + BASE_LASER_DISC_NUM);
-#else
-	out_message(_T("LD: Ejected"));
-#endif
 }
 
 bool EMU::is_laser_disc_inserted(int drv)
 {
-	return vm->is_laser_disc_inserted(drv);
+	if(drv < USE_LASER_DISC) {
+		return vm->is_laser_disc_inserted(drv);
+	} else {
+		return false;
+	}
 }
 
 uint32_t EMU::is_laser_disc_accessed()
@@ -2933,6 +3154,10 @@ bool EMU::load_state_tmp(const _TCHAR* file_path)
 				reinitialize |= (printer_type != config.printer_type);
 				printer_type = config.printer_type;
 #endif
+#ifdef USE_SERIAL_TYPE
+				reinitialize |= (serial_type != config.serial_type);
+				serial_type = config.serial_type;
+#endif
 				if(!(0 <= config.sound_frequency && config.sound_frequency < 8)) {
 					config.sound_frequency = 6;	// default: 48KHz
 				}
@@ -2980,6 +3205,11 @@ bool EMU::load_state_tmp(const _TCHAR* file_path)
 	osd->unlock_vm();
 	delete fio;
 	return result;
+}
+
+const _TCHAR *EMU::state_file_path(int num)
+{
+	return create_local_path(_T("%s.sta%d"), _T(CONFIG_NAME), num);
 }
 #endif
 

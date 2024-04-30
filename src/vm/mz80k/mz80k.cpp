@@ -80,6 +80,7 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	
 #if defined(SUPPORT_MZ80AIF)
 	io = new IO(this, emu);
+	io->space = 0x100;
 	fdc = new MB8877(this, emu);	// mb8866
 	fdc->set_context_noise_seek(new NOISE(this, emu));
 	fdc->set_context_noise_head_down(new NOISE(this, emu));
@@ -87,6 +88,7 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	mz80aif = new MZ80AIF(this, emu);
 #elif defined(SUPPORT_MZ80FIO)
 	io = new IO(this, emu);
+	io->space = 0x100;
 	fdc = new T3444A(this, emu);	// t3444m
 	fdc->set_context_noise_seek(new NOISE(this, emu));
 	fdc->set_context_noise_head_down(new NOISE(this, emu));
@@ -477,8 +479,8 @@ bool VM::process_state(FILEIO* state_fio, bool loading)
 		return false;
 	}
 	for(DEVICE* device = first_device; device; device = device->next_device) {
-		const char *name = typeid(*device).name() + 6; // skip "class "
-		int len = strlen(name);
+		const _TCHAR *name = char_to_tchar(typeid(*device).name() + 6); // skip "class "
+		int len = (int)_tcslen(name);
 		
 		if(!state_fio->StateCheckInt32(len)) {
 			return false;

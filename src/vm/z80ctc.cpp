@@ -20,9 +20,11 @@ void Z80CTC::reset()
 		counter[ch].control = 0;
 		counter[ch].slope = false;
 		counter[ch].prescaler = 256;
-		counter[ch].freeze = counter[ch].start = counter[ch].latch = false;
+		counter[ch].freeze = counter[ch].freezed = false;
+		counter[ch].start = counter[ch].latch = false;
 		counter[ch].clock_id = counter[ch].sysclock_id = -1;
 		counter[ch].first_constant = true;
+		counter[ch].remain = 0;
 		// interrupt
 		counter[ch].req_intr = false;
 		counter[ch].in_service = false;
@@ -38,10 +40,11 @@ void Z80CTC::write_io8(uint32_t addr, uint32_t data)
 		// time constant
 		counter[ch].constant = data ? data : 256;
 		counter[ch].latch = false;
-		if(counter[ch].freeze || counter[ch].first_constant) {
+		if(counter[ch].freezed || counter[ch].first_constant) {
 			counter[ch].count = counter[ch].constant;
 			counter[ch].clocks = 0;
 			counter[ch].freeze = false;
+//			counter[ch].freezed = false;
 			counter[ch].first_constant = false;
 			update_event(ch, 0);
 		}
@@ -51,12 +54,15 @@ void Z80CTC::write_io8(uint32_t addr, uint32_t data)
 			counter[ch].prescaler = (data & 0x20) ? 256 : 16;
 			counter[ch].latch = ((data & 0x04) != 0);
 			counter[ch].freeze = ((data & 0x02) != 0);
+			if(counter[ch].freeze) {
+				counter[ch].freezed = true;
+			}
 			counter[ch].start = (counter[ch].freq || !(data & 0x08));
 			counter[ch].control = data;
 			counter[ch].slope = ((data & 0x10) != 0);
 			if((data & 0x02) && (counter[ch].req_intr || counter[ch].in_service)) {
 				counter[ch].req_intr = false;
-				counter[ch].in_service = false;
+//				counter[ch].in_service = false;
 				update_intr();
 			}
 			if(!(data & 0x80) && counter[ch].req_intr) {
@@ -155,11 +161,14 @@ void Z80CTC::input_clock(int ch, int clock)
 	if(!(counter[ch].control & 0x40)) {
 		// now timer mode, start timer and quit !!!
 		counter[ch].start = true;
+		counter[ch].remain = 0;
 		return;
 	}
 	if(counter[ch].freeze) {
+		counter[ch].remain = 0;
 		return;
 	}
+	counter[ch].freezed = false;
 	
 	// update counter
 	counter[ch].count -= clock;
@@ -178,11 +187,15 @@ void Z80CTC::input_sysclock(int ch, int clock)
 {
 	if(counter[ch].control & 0x40) {
 		// now counter mode, quit !!!
+		counter[ch].remain = 0;
 		return;
 	}
 	if(!counter[ch].start || counter[ch].freeze) {
+		counter[ch].remain = 0;
 		return;
 	}
+	counter[ch].freezed = false;
+	
 	counter[ch].clocks += clock;
 	int input = counter[ch].clocks >> (counter[ch].prescaler == 256 ? 8 : 4);
 	counter[ch].clocks &= counter[ch].prescaler - 1;
@@ -218,7 +231,9 @@ void Z80CTC::update_event(int ch, int err)
 		}
 		if(counter[ch].clock_id == -1 && counter[ch].freq) {
 			counter[ch].input = counter[ch].count;
-			counter[ch].period = (uint32_t)(cpu_clocks * counter[ch].input / counter[ch].freq) + err;
+			counter[ch].remain += (double)counter[ch].input * cpu_clocks / counter[ch].freq + err;
+			counter[ch].period = (uint32_t)counter[ch].remain;
+			counter[ch].remain -= counter[ch].period;
 			counter[ch].prev = get_current_clock() + err;
 			register_event_by_clock(this, EVENT_COUNTER + ch, counter[ch].period, false, &counter[ch].clock_id);
 		}
@@ -239,9 +254,12 @@ void Z80CTC::update_event(int ch, int err)
 		if(counter[ch].sysclock_id == -1) {
 			counter[ch].input = counter[ch].count * counter[ch].prescaler - counter[ch].clocks;
 #ifdef Z80CTC_CLOCKS
-			counter[ch].period = (uint32_t)(counter[ch].input * cpu_clocks / Z80CTC_CLOCKS) + err;
+			counter[ch].remain += (double)counter[ch].input * cpu_clocks / Z80CTC_CLOCKS + err;
+			counter[ch].period = (uint32_t)counter[ch].remain;
+			counter[ch].remain -= counter[ch].period;
 #else
 			counter[ch].period = counter[ch].input + err;
+			counter[ch].remain = 0;
 #endif
 			counter[ch].prev = get_current_clock() + err;
 			register_event_by_clock(this, EVENT_TIMER + ch, counter[ch].period, false, &counter[ch].sysclock_id);
@@ -333,9 +351,10 @@ void Z80CTC::notify_intr_reti()
 	if(d_child) {
 		d_child->notify_intr_reti();
 	}
+	update_intr();
 }
 
-#define STATE_VERSION	1
+#define STATE_VERSION	3
 
 bool Z80CTC::process_state(FILEIO* state_fio, bool loading)
 {
@@ -354,6 +373,7 @@ bool Z80CTC::process_state(FILEIO* state_fio, bool loading)
 		state_fio->StateValue(counter[i].clocks);
 		state_fio->StateValue(counter[i].prescaler);
 		state_fio->StateValue(counter[i].freeze);
+		state_fio->StateValue(counter[i].freezed);
 		state_fio->StateValue(counter[i].start);
 		state_fio->StateValue(counter[i].latch);
 		state_fio->StateValue(counter[i].prev_in);
@@ -363,6 +383,7 @@ bool Z80CTC::process_state(FILEIO* state_fio, bool loading)
 		state_fio->StateValue(counter[i].sysclock_id);
 		state_fio->StateValue(counter[i].input);
 		state_fio->StateValue(counter[i].period);
+		state_fio->StateValue(counter[i].remain);
 		state_fio->StateValue(counter[i].prev);
 		state_fio->StateValue(counter[i].req_intr);
 		state_fio->StateValue(counter[i].in_service);

@@ -122,7 +122,8 @@ BEGIN
             MENUITEM "State 9",                 ID_LOAD_STATE9
         END
         MENUITEM SEPARATOR
-        MENUITEM "Debug Main CPU",              ID_OPEN_DEBUGGER0
+        MENUITEM "Debug 80286",                 ID_OPEN_DEBUGGER0
+        MENUITEM "Debug V30",                   ID_OPEN_DEBUGGER1
         MENUITEM "Close Debugger",              ID_CLOSE_DEBUGGER
         MENUITEM SEPARATOR
         MENUITEM "Exit",                        ID_EXIT
@@ -157,6 +158,8 @@ BEGIN
     BEGIN
         MENUITEM "Mount",                       ID_OPEN_HD1
         MENUITEM "Unmount",                     ID_CLOSE_HD1
+        MENUITEM "Mount Blank 20MB Disk",       ID_OPEN_BLANK_20MB_HD1
+        MENUITEM "Mount Blank 40MB Disk",       ID_OPEN_BLANK_40MB_HD1
         MENUITEM SEPARATOR
         MENUITEM "Recent",                      ID_RECENT_HD1
     END
@@ -164,6 +167,8 @@ BEGIN
     BEGIN
         MENUITEM "Mount",                       ID_OPEN_HD2
         MENUITEM "Unmount",                     ID_CLOSE_HD2
+        MENUITEM "Mount Blank 20MB Disk",       ID_OPEN_BLANK_20MB_HD2
+        MENUITEM "Mount Blank 40MB Disk",       ID_OPEN_BLANK_40MB_HD2
         MENUITEM SEPARATOR
         MENUITEM "Recent",                      ID_RECENT_HD2
     END
@@ -173,6 +178,19 @@ BEGIN
         BEGIN
             MENUITEM "80286 10MHz",             ID_VM_CPU_TYPE0
             MENUITEM "80286  8MHz",             ID_VM_CPU_TYPE1
+            MENUITEM "V30 10MHz",               ID_VM_CPU_TYPE2
+            MENUITEM "V30  8MHz",               ID_VM_CPU_TYPE3
+        END
+        POPUP "DIP Switch"
+        BEGIN
+            MENUITEM "SW 2-1",                  ID_VM_DIPSWITCH16
+            MENUITEM "SW 2-2 (Terminal)",       ID_VM_DIPSWITCH17
+            MENUITEM "SW 2-3 (80 Columns)",     ID_VM_DIPSWITCH18
+            MENUITEM "SW 2-4 (25 Lines)",       ID_VM_DIPSWITCH19
+            MENUITEM "SW 2-5 (Hold Memory Switch)", ID_VM_DIPSWITCH20
+            MENUITEM "SW 2-6 (Disable HDD)",    ID_VM_DIPSWITCH21
+            MENUITEM "SW 2-7",                  ID_VM_DIPSWITCH22
+            MENUITEM "SW 2-8 (GDC 5MHz)",       ID_VM_DIPSWITCH23
         END
         POPUP "Sound"
         BEGIN
@@ -196,6 +214,13 @@ BEGIN
             MENUITEM "Write Printer to File",   ID_VM_PRINTER_TYPE0
             MENUITEM "PC-PR201",                ID_VM_PRINTER_TYPE1, GRAYED
             MENUITEM "None",                    ID_VM_PRINTER_TYPE2
+        END
+        POPUP "Serial"
+        BEGIN
+            MENUITEM "Physical Comm Port",      ID_VM_SERIAL_TYPE0, GRAYED
+            MENUITEM "Named Pipe",              ID_VM_SERIAL_TYPE1, GRAYED
+            MENUITEM "MIDI Device",             ID_VM_SERIAL_TYPE2
+            MENUITEM "None",                    ID_VM_SERIAL_TYPE3
         END
     END
     POPUP "Host"
@@ -259,6 +284,7 @@ BEGIN
             MENUITEM "Joystick To Keyboard",    ID_INPUT_JOYTOKEY
         END
         MENUITEM SEPARATOR
+        MENUITEM "Use Direct2D1",               ID_HOST_USE_D2D1
         MENUITEM "Use Direct3D9",               ID_HOST_USE_D3D9
         MENUITEM "Wait Vsync",                  ID_HOST_WAIT_VSYNC
         MENUITEM "Use DirectInput",             ID_HOST_USE_DINPUT
@@ -275,6 +301,7 @@ END
 
 IDI_BITMAP_ACCESS_OFF   BITMAP  DISCARDABLE     "indicator/access_off.bmp"
 IDI_BITMAP_ACCESS_ON    BITMAP  DISCARDABLE     "indicator/access_on.bmp"
+IDI_BITMAP_ACCESS_ON2   BITMAP  DISCARDABLE     "indicator/access_green.bmp"
 
 
 /////////////////////////////////////////////////////////////////////////////

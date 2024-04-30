@@ -54,8 +54,11 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	mcu_drec->set_context_noise_stop(new NOISE(this, emu));
 	mcu_drec->set_context_noise_fast(new NOISE(this, emu));
 	mcu_io = new IO(this, emu);
+	mcu_io->space = 0x100;
 	mcu_vdp = new MC6847(this, emu);
 	mcu_mem = new MEMORY(this, emu);
+	mcu_mem->space = 0x10000;
+	mcu_mem->bank_size = 0x800;
 	mcu_not = new NOT(this, emu);
 	mcu_cpu = new Z80(this, emu);
 	mcu_pio = new Z80PIO(this, emu);
@@ -65,7 +68,10 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	pcu_pio2 = new I8255(this, emu);
 	pcu_pio3 = new I8255(this, emu);
 	pcu_io = new IO(this, emu);
+	pcu_io->space = 0x100;
 	pcu_mem = new MEMORY(this, emu);
+	pcu_mem->space = 0x10000;
+	pcu_mem->bank_size = 0x1000;
 	pcu_rtc = new RP5C01(this, emu);
 	pcu_cpu = new Z80(this, emu);
 	pcu_ctc1 = new Z80CTC(this, emu);
@@ -191,7 +197,9 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	mcu_io->set_iomap_alias_r  (0xc1, mcu_psg, 1);	// PSG data
 	mcu_io->set_iomap_range_rw (0xe0, 0xe3, mcu_pio);
 	
+#ifdef _IO_DEBUG_LOG
 	pcu_io->cpu_index = 1;
+#endif
 	pcu_io->set_iomap_range_rw (0x00, 0x03, pcu_ctc1);
 	pcu_io->set_iomap_range_rw (0x08, 0x0b, pcu_ctc2);
 	pcu_io->set_iomap_alias_rw (0x10, pcu_pio, 0);
@@ -419,8 +427,8 @@ bool VM::process_state(FILEIO* state_fio, bool loading)
 		return false;
 	}
 	for(DEVICE* device = first_device; device; device = device->next_device) {
-		const char *name = typeid(*device).name() + 6; // skip "class "
-		int len = strlen(name);
+		const _TCHAR *name = char_to_tchar(typeid(*device).name() + 6); // skip "class "
+		int len = (int)_tcslen(name);
 		
 		if(!state_fio->StateCheckInt32(len)) {
 			return false;

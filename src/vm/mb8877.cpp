@@ -180,6 +180,7 @@ void MB8877::reset()
 #ifdef HAS_MB89311
 	extended_mode = true;
 #endif
+	update_ready();
 }
 
 void MB8877::write_io8(uint32_t addr, uint32_t data)
@@ -503,7 +504,8 @@ uint32_t MB8877::read_io8(uint32_t addr)
 			if(cmdtype == FDC_CMD_RD_SEC || cmdtype == FDC_CMD_RD_MSEC) {
 				// read or multisector read
 				if(fdc[drvreg].index < disk[drvreg]->sector_size.sd) {
-					datareg = disk[drvreg]->sector[fdc[drvreg].index];
+					uint8_t mask = disk[drvreg]->unstable ? disk[drvreg]->unstable[fdc[drvreg].index] : 0;
+					datareg = (disk[drvreg]->sector[fdc[drvreg].index] & ~mask) | (rand() & mask);
 					//fdc[drvreg].index++;
 				}
 				if((fdc[drvreg].index + 1) >= disk[drvreg]->sector_size.sd) {
@@ -611,10 +613,12 @@ void MB8877::write_signal(int id, uint32_t data, uint32_t mask)
 		drvreg = data & DRIVE_MASK;
 		drive_sel = true;
 		seekend_clock = get_current_clock();
+		update_ready();
 	} else if(id == SIG_MB8877_SIDEREG) {
 		sidereg = (data & mask) ? 1 : 0;
 	} else if(id == SIG_MB8877_MOTOR) {
 		motor_on = ((data & mask) != 0);
+		update_ready();
 	}
 }
 
@@ -1262,6 +1266,11 @@ void MB8877::update_head_flag(int drv, bool head_load)
 	}
 }
 
+void MB8877::update_ready()
+{
+	write_signals(&outputs_rdy, is_drive_ready() ? 0xffffffff : 0);
+}
+
 // ----------------------------------------------------------------------------
 // media handler
 // ----------------------------------------------------------------------------
@@ -1278,7 +1287,12 @@ uint8_t MB8877::search_track()
 	// verify track number
 	if(disk[drvreg]->ignore_crc()) {
 		for(int i = 0; i < disk[drvreg]->sector_num.sd; i++) {
-			disk[drvreg]->get_sector(-1, -1, i);
+			if(!disk[drvreg]->get_sector(-1, -1, i)) {
+				continue;
+			}
+			if(disk[drvreg]->drive_mfm != disk[drvreg]->sector_mfm) {
+				continue;
+			}
 			if(disk[drvreg]->id[0] == trkreg) {
 				fdc[drvreg].next_trans_position = disk[drvreg]->id_position[i] + 4 + 2;
 				fdc[drvreg].next_am1_position = disk[drvreg]->am1_position[i];
@@ -1287,7 +1301,12 @@ uint8_t MB8877::search_track()
 		}
 	} else {
 		for(int i = 0; i < disk[drvreg]->sector_num.sd; i++) {
-			disk[drvreg]->get_sector(-1, -1, i);
+			if(!disk[drvreg]->get_sector(-1, -1, i)) {
+				continue;
+			}
+			if(disk[drvreg]->drive_mfm != disk[drvreg]->sector_mfm) {
+				continue;
+			}
 			if(disk[drvreg]->id[0] == trkreg && !disk[drvreg]->addr_crc_error) {
 				fdc[drvreg].next_trans_position = disk[drvreg]->id_position[i] + 4 + 2;
 				fdc[drvreg].next_am1_position = disk[drvreg]->am1_position[i];
@@ -1295,7 +1314,12 @@ uint8_t MB8877::search_track()
 			}
 		}
 		for(int i = 0; i < disk[drvreg]->sector_num.sd; i++) {
-			disk[drvreg]->get_sector(-1, -1, i);
+			if(!disk[drvreg]->get_sector(-1, -1, i)) {
+				continue;
+			}
+			if(disk[drvreg]->drive_mfm != disk[drvreg]->sector_mfm) {
+				continue;
+			}
 			if(disk[drvreg]->id[0] == trkreg) {
 				return FDC_ST_SEEKERR | FDC_ST_CRCERR;
 			}
@@ -1341,8 +1365,13 @@ uint8_t MB8877::search_sector()
 	for(int i = 0; i < sector_num; i++) {
 		// get sector
 		int index = (first_sector + i) % sector_num;
-		disk[drvreg]->get_sector(-1, -1, index);
 		
+		if(!disk[drvreg]->get_sector(-1, -1, index)) {
+			continue;
+		}
+		if(disk[drvreg]->drive_mfm != disk[drvreg]->sector_mfm) {
+			continue;
+		}
 		// check id
 		if(disk[drvreg]->id[0] != trkreg) {
 			continue;
@@ -1415,9 +1444,17 @@ uint8_t MB8877::search_addr()
 	}
 	
 	// get sector
-	if(disk[drvreg]->get_sector(-1, -1, first_sector)) {
-		fdc[drvreg].next_trans_position = disk[drvreg]->id_position[first_sector] + 1;
-		fdc[drvreg].next_am1_position = disk[drvreg]->am1_position[first_sector];
+	for(int i = 0; i < sector_num; i++) {
+		int index = (first_sector + i) % sector_num;
+		
+		if(!disk[drvreg]->get_sector(-1, -1, index)) {
+			continue;
+		}
+		if(disk[drvreg]->drive_mfm != disk[drvreg]->sector_mfm) {
+			continue;
+		}
+		fdc[drvreg].next_trans_position = disk[drvreg]->id_position[index] + 1;
+		fdc[drvreg].next_am1_position = disk[drvreg]->am1_position[index];
 		fdc[drvreg].index = 0;
 		secreg = disk[drvreg]->id[0];
 		return 0;
@@ -1539,6 +1576,7 @@ void MB8877::open_disk(int drv, const _TCHAR* file_path, int bank)
 {
 	if(drv < MAX_DRIVE) {
 		disk[drv]->open(file_path, bank);
+		update_ready();
 	}
 }
 
@@ -1550,6 +1588,7 @@ void MB8877::close_disk(int drv)
 			cmdtype = 0;
 		}
 		update_head_flag(drv, false);
+		update_ready();
 	}
 }
 
@@ -1557,6 +1596,14 @@ bool MB8877::is_disk_inserted(int drv)
 {
 	if(drv < MAX_DRIVE) {
 		return disk[drv]->inserted;
+	}
+	return false;
+}
+
+bool MB8877::is_disk_changed(int drv)
+{
+	if(drv < MAX_DRIVE) {
+		return disk[drv]->changed;
 	}
 	return false;
 }
@@ -1572,6 +1619,19 @@ bool MB8877::is_disk_protected(int drv)
 {
 	if(drv < MAX_DRIVE) {
 		return disk[drv]->write_protected;
+	}
+	return false;
+}
+
+bool MB8877::is_drive_ready()
+{
+	return is_drive_ready(drvreg);
+}
+
+bool MB8877::is_drive_ready(int drv)
+{
+	if(drv < MAX_DRIVE) {
+		return disk[drv]->inserted && motor_on;
 	}
 	return false;
 }
@@ -1659,10 +1719,12 @@ bool MB8877::get_debug_regs_info(_TCHAR *buffer, size_t buffer_len)
 	
 	for(int i = 0; i < disk[drvreg]->sector_num.sd; i++) {
 		uint8_t c, h, r, n;
+		bool mfm;
 		int length;
-		if(disk[drvreg]->get_sector_info(-1, -1, i, &c, &h, &r, &n, &length)) {
+		if(disk[drvreg]->get_sector_info(-1, -1, i, &c, &h, &r, &n, &mfm, &length)) {
 			my_tcscat_s(buffer, buffer_len,
-			create_string(_T("\nSECTOR %2d: C=%02X H=%02X R=%02X N=%02X SIZE=%4d AM1=%5d DATA=%5d"), i + 1, c, h, r, n, length, disk[drvreg]->am1_position[i], disk[drvreg]->data_position[i]));
+			create_string(_T("\nSECTOR %2d: C=%02X H=%02X R=%02X N=%02X DENS=%s SIZE=%4d AM1=%5d DATA=%5d"),
+				i + 1, c, h, r, n, mfm ? "MFM" : " FM", length, disk[drvreg]->am1_position[i], disk[drvreg]->data_position[i]));
 			if(position >= disk[drvreg]->am1_position[i] && position < disk[drvreg]->data_position[i] + length) {
 				my_tcscat_s(buffer, buffer_len, _T(" <==="));
 			}

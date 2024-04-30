@@ -47,7 +47,6 @@ public:
 	
 	// debugger
 	virtual DEVICE *get_cpu(int num) { return NULL; }
-	virtual uint32_t get_cpu_pc() { return 0; }
 	virtual void initialize(void) { }
 	virtual void update_dipswitch(void) { }
 	
@@ -110,10 +109,14 @@ public:
 	virtual void close_tape(int drv) { }
 	
 	virtual uint32_t is_floppy_disk_accessed() { return 0; }
+	virtual uint32_t floppy_disk_indicator_color() { return 0; }
 	virtual uint32_t is_quick_disk_accessed() { return 0; }
 	virtual uint32_t is_hard_disk_accessed() { return 0; }
 	virtual uint32_t is_compact_disc_accessed() { return 0; }
 	virtual uint32_t is_laser_disc_accessed() { return 0; }
+	
+	virtual bool is_floppy_disk_connected(int drv) { return true; }
+	virtual bool is_quick_disk_connected(int drv) { return true; }
 	
 	virtual bool is_floppy_disk_inserted(int drv) { return false; }
 	virtual bool is_quick_disk_inserted(int drv) { return false; }

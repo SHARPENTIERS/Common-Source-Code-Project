@@ -27,13 +27,21 @@ devenv.com bubcom80.vcproj /Rebuild Release
 mkdir build_xp\bubcom80
 copy Release\bubcom80.exe build_xp\bubcom80\.
 
+devenv.com bx1.vcproj /Rebuild Release
+mkdir build_xp\bx1
+copy Release\bx1.exe build_xp\bx1\.
+
 devenv.com colecovision.vcproj /Rebuild Release
 mkdir build_xp\colecovision
 copy Release\colecovision.exe build_xp\colecovision\.
 
-devenv.com ex80.vcproj /Rebuild Release
-mkdir build_xp\ex80
-copy Release\ex80.exe build_xp\ex80\.
+devenv.com crc80.vcproj /Rebuild Release
+mkdir build_xp\crc80
+copy Release\crc80.exe build_xp\crc80\.
+
+devenv.com ex80bs.vcproj /Rebuild Release
+mkdir build_xp\ex80bs
+copy Release\ex80bs.exe build_xp\ex80bs\.
 
 devenv.com familybasic.vcproj /Rebuild Release
 mkdir build_xp\familybasic
@@ -60,8 +68,10 @@ copy Release\fm77av40.exe build_xp\fm77av40\.
 copy Release\fm77av40ex.exe build_xp\fm77av40\.
 
 devenv.com fm16beta_i186.vcproj /Rebuild Release
+devenv.com fm16beta_i286.vcproj /Rebuild Release
 mkdir build_xp\fm16beta
 copy Release\fm16beta_i186.exe build_xp\fm16beta\.
+copy Release\fm16beta_i286.exe build_xp\fm16beta\.
 
 devenv.com fm16pi.vcproj /Rebuild Release
 mkdir build_xp\fm16pi
@@ -97,6 +107,10 @@ devenv.com fp1100.vcproj /Rebuild Release
 mkdir build_xp\fp1100
 copy Release\fp1100.exe build_xp\fp1100\.
 
+devenv.com fx9000p.vcproj /Rebuild Release
+mkdir build_xp\fx9000p
+copy Release\fx9000p.exe build_xp\fx9000p\.
+
 devenv.com gamegear.vcproj /Rebuild Release
 mkdir build_xp\gamegear
 copy Release\gamegear.exe build_xp\gamegear\.
@@ -127,6 +141,10 @@ copy Release\jx.exe build_xp\jx\.
 mkdir build_xp\jx_hires
 copy Release\jx.exe build_xp\jx_hires\.
 
+devenv.com m23.vcproj /Rebuild Release
+mkdir build_xp\m23
+copy Release\m23.exe build_xp\m23\.
+
 devenv.com m5.vcproj /Rebuild Release
 mkdir build_xp\m5
 copy Release\m5.exe build_xp\m5\.
@@ -138,6 +156,14 @@ copy Release\map1010.exe build_xp\map1010\.
 devenv.com mastersystem.vcproj /Rebuild Release
 mkdir build_xp\mastersystem
 copy Release\mastersystem.exe build_xp\mastersystem\.
+
+devenv.com micom_mahjong.vcproj /Rebuild Release
+mkdir build_xp\micom_mahjong
+copy Release\micom_mahjong.exe build_xp\micom_mahjong\.
+
+devenv.com mp85.vcproj /Rebuild Release
+mkdir build_xp\mp85
+copy Release\mp85.exe build_xp\mp85\.
 
 devenv.com msx1.vcproj /Rebuild Release
 devenv.com msx2.vcproj /Rebuild Release
@@ -174,6 +200,10 @@ copy Release\mz80k.exe build_xp\mz80k\.
 devenv.com mz700.vcproj /Rebuild Release
 mkdir build_xp\mz700
 copy Release\mz700.exe build_xp\mz700\.
+
+devenv.com mz700pal.vcproj /Rebuild Release
+mkdir build_xp\mz700pal
+copy Release\mz700pal.exe build_xp\mz700pal\.
 
 devenv.com mz800.vcproj /Rebuild Release
 mkdir build_xp\mz800
@@ -373,6 +403,14 @@ mkdir build_xp\smc777
 copy Release\smc70.exe build_xp\smc777\.
 copy Release\smc777.exe build_xp\smc777\.
 
+devenv.com svi3x8.vcproj /Rebuild Release
+mkdir build_xp\svi3x8
+copy Release\svi3x8.exe build_xp\svi3x8\.
+
+devenv.com t250.vcproj /Rebuild Release
+mkdir build_xp\t250
+copy Release\t250.exe build_xp\t250\.
+
 devenv.com tk80bs.vcproj /Rebuild Release
 mkdir build_xp\tk80bs
 copy Release\tk80bs.exe build_xp\tk80bs\.
@@ -380,6 +418,14 @@ copy Release\tk80bs.exe build_xp\tk80bs\.
 devenv.com tk85.vcproj /Rebuild Release
 mkdir build_xp\tk85
 copy Release\tk85.exe build_xp\tk85\.
+
+devenv.com trnjr.vcproj /Rebuild Release
+mkdir build_xp\trnjr
+copy Release\trnjr.exe build_xp\trnjr\.
+
+devenv.com tvboy.vcproj /Rebuild Release
+mkdir build_xp\tvboy
+copy Release\tvboy.exe build_xp\tvboy\.
 
 devenv.com x07.vcproj /Rebuild Release
 mkdir build_xp\x07

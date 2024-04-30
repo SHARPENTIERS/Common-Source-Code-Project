@@ -18,14 +18,15 @@
 //#include "../i8250.h"
 #include "../i8253.h"
 #include "../i8259.h"
-#include "../i286.h"
 #include "../io.h"
 #include "../noise.h"
 #include "../pcm1bit.h"
 #include "../upd765a.h"
 #ifdef TYPE_SL
+#include "../i86.h"
 #include "../rp5c01.h"
 #else
+#include "../i286.h"
 #include "../hd146818p.h"
 #endif
 
@@ -70,10 +71,24 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 #endif
 #endif
 //	sio = new I8250(this, emu);
-	pit = new I8253(this, emu);	// i8254
+	pit = new I8253(this, emu);
+#if !(defined(_J3100SS) || defined(_J3100SE))
+	pit->device_model = INTEL_8254;
+	pit->set_device_name(_T("8254 PIT"));
+#endif
 	pic = new I8259(this, emu);
+#ifndef TYPE_SL
+	pic->num_chips = 2;
+#endif
+#ifdef TYPE_SL
+	cpu = new I86(this, emu);
+	cpu->device_model = INTEL_8086;
+#else
 	cpu = new I286(this, emu);
+#endif
 	io = new IO(this, emu);
+	io->space = 0x10000;
+	io->bus_width = 16;
 	pcm = new PCM1BIT(this, emu);
 	fdc = new UPD765A(this, emu);
 	fdc->set_context_noise_seek(new NOISE(this, emu));
@@ -111,6 +126,7 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	// dmac
 	io->set_iomap_range_rw(0x00, 0x0f, dma);
 	io->set_iomap_range_w(0x80, 0x8f, dmareg);
+	dma->set_context_cpu(cpu);
 	dma->set_context_memory(memory);
 	dma->set_context_ch2(fdc);
 	dmareg->set_context_dma(dma);
@@ -411,7 +427,7 @@ void VM::update_config()
 	}
 }
 
-#define STATE_VERSION	2
+#define STATE_VERSION	3
 
 bool VM::process_state(FILEIO* state_fio, bool loading)
 {
@@ -419,8 +435,8 @@ bool VM::process_state(FILEIO* state_fio, bool loading)
 		return false;
 	}
 	for(DEVICE* device = first_device; device; device = device->next_device) {
-		const char *name = typeid(*device).name() + 6; // skip "class "
-		int len = strlen(name);
+		const _TCHAR *name = char_to_tchar(typeid(*device).name() + 6); // skip "class "
+		int len = (int)_tcslen(name);
 		
 		if(!state_fio->StateCheckInt32(len)) {
 			return false;

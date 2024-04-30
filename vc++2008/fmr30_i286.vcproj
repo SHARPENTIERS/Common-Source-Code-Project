@@ -550,6 +550,26 @@
 					</FileConfiguration>
 				</File>
 				<File
+					RelativePath="..\src\vm\i386_dasm.cpp"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+				</File>
+				<File
 					RelativePath="..\src\vm\i8237.cpp"
 					>
 					<FileConfiguration
@@ -651,6 +671,26 @@
 				</File>
 				<File
 					RelativePath="..\src\vm\mb8877.cpp"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+				</File>
+				<File
+					RelativePath="..\src\vm\memory.cpp"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
@@ -875,7 +915,7 @@
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath="..\src\vm\fmr30\memory.cpp"
+					RelativePath="..\src\vm\fmr30\membus.cpp"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
@@ -1063,6 +1103,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\src\vm\i386_dasm.h"
+					>
+				</File>
+				<File
 					RelativePath="..\src\vm\i8237.h"
 					>
 				</File>
@@ -1084,6 +1128,10 @@
 				</File>
 				<File
 					RelativePath="..\src\vm\mb8877.h"
+					>
+				</File>
+				<File
+					RelativePath="..\src\vm\memory.h"
 					>
 				</File>
 				<File
@@ -1140,7 +1188,7 @@
 					>
 				</File>
 				<File
-					RelativePath="..\src\vm\fmr30\memory.h"
+					RelativePath="..\src\vm\fmr30\membus.h"
 					>
 				</File>
 				<File
@@ -1196,7 +1244,7 @@
 				</FileConfiguration>
 			</File>
 			<File
-				RelativePath="..\src\res\resource.h"
+				RelativePath="..\src\res\indicator\access_green.bmp"
 				>
 			</File>
 			<File
@@ -1205,6 +1253,10 @@
 			</File>
 			<File
 				RelativePath="..\src\res\indicator\access_on.bmp"
+				>
+			</File>
+			<File
+				RelativePath="..\src\res\resource.h"
 				>
 			</File>
 		</Filter>

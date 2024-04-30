@@ -12,33 +12,43 @@
 #define _FMR50_H_
 
 #if defined(_FMR50)
-#if defined(HAS_I286)
-#define DEVICE_NAME		"FUJITSU FMR-50 (i286)"
-#define CONFIG_NAME		"fmr50_i286"
-#elif defined(HAS_I386)
-#define DEVICE_NAME		"FUJITSU FMR-50 (i386)"
-#define CONFIG_NAME		"fmr50_i386"
-#elif defined(HAS_I486)
-#define DEVICE_NAME		"FUJITSU FMR-50 (i486)"
-#define CONFIG_NAME		"fmr50_i486"
-#elif defined(HAS_PENTIUM)
-#define DEVICE_NAME		"FUJITSU FMR-250"
-#define CONFIG_NAME		"fmr250"
-#endif
+	#if defined(HAS_I286)
+		#define DEVICE_NAME		"FUJITSU FMR-50 (i286)"
+		#define CONFIG_NAME		"fmr50_i286"
+	#elif defined(HAS_I386)
+		#define DEVICE_NAME		"FUJITSU FMR-50 (i386)"
+		#define CONFIG_NAME		"fmr50_i386"
+	#elif defined(HAS_I486)
+		#define DEVICE_NAME		"FUJITSU FMR-50 (i486)"
+		#define CONFIG_NAME		"fmr50_i486"
+	#elif defined(HAS_PENTIUM)
+		#define DEVICE_NAME		"FUJITSU FMR-250"
+		#define CONFIG_NAME		"fmr250"
+	#endif
 #elif defined(_FMR60)
-#if defined(HAS_I286)
-#define DEVICE_NAME		"FUJITSU FMR-60"
-#define CONFIG_NAME		"fmr60"
-#elif defined(HAS_I386)
-#define DEVICE_NAME		"FUJITSU FMR-70"
-#define CONFIG_NAME		"fmr70"
-#elif defined(HAS_I486)
-#define DEVICE_NAME		"FUJITSU FMR-80"
-#define CONFIG_NAME		"fmr80"
-#elif defined(HAS_PENTIUM)
-#define DEVICE_NAME		"FUJITSU FMR-280"
-#define CONFIG_NAME		"fmr280"
+	#if defined(HAS_I286)
+		#define DEVICE_NAME		"FUJITSU FMR-60"
+		#define CONFIG_NAME		"fmr60"
+	#elif defined(HAS_I386)
+		#define DEVICE_NAME		"FUJITSU FMR-70"
+		#define CONFIG_NAME		"fmr70"
+	#elif defined(HAS_I486)
+		#define DEVICE_NAME		"FUJITSU FMR-80"
+		#define CONFIG_NAME		"fmr80"
+	#elif defined(HAS_PENTIUM)
+		#define DEVICE_NAME		"FUJITSU FMR-280"
+		#define CONFIG_NAME		"fmr280"
+	#endif
 #endif
+#if defined(HAS_I486)
+	#if !(defined(HAS_I486SX) || defined(HAS_I486DX))
+		#define HAS_I486SX
+//		#define HAS_I486DX
+	#endif
+#else
+	#if (defined(HAS_I486SX) || defined(HAS_I486DX))
+		#define HAS_I486
+	#endif
 #endif
 
 // device informations for virtual machine
@@ -63,15 +73,9 @@
 #endif
 #define MAX_DRIVE		4
 #define MAX_MEMCARD		2
-#if defined(HAS_I286)
 #define I86_PSEUDO_BIOS
-#else
-#define I386_PSEUDO_BIOS
-#endif
-#define I8259_MAX_CHIPS		2
 #define SINGLE_MODE_DMA
 #define MB8877_NO_BUSY_AFTER_SEEK
-#define IO_ADDR_MAX		0x10000
 #define SCSI_HOST_AUTO_ACK
 
 // device informations for win32

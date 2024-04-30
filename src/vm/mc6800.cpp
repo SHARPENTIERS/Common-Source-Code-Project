@@ -3,7 +3,7 @@
 
 	Origin : MAME 0.142
 	Author : Takeda.Toshiya
-	Date  : 2011.04.23-
+	Date   : 2011.04.23-
 
 	[ MC6800 ]
 */
@@ -648,7 +648,8 @@ void MC6800::reset()
 	CC = 0xc0;
 	SEI; /* IRQ disabled */
 	PCD = RM16(0xfffe);
-	S = X = D = EA = 0;
+//	S = X = D = EA = 0;
+	SD = X = D = EAD = 0;
 	
 	wai_state = 0;
 	int_state = 0;

@@ -1,3 +1,664 @@
+1/1/2024
+
+[VM/DISK] fix imagedisk importer
+
+
+12/31/2023
+
+[VM/I8257] add code for debug
+
+[T250] support TOSHIBA T-250
+
+
+12/16/2023
+
+[X1TURBO/DISPLAY] fix text renderer for vertial doubled character
+
+
+6/11/2023
+
+[VM/I8257] support i8257
+
+[BUBCOM80/DISPLAY] fix i8257 status register
+[PC8801/PC88] fix i8257 status register
+[QC10/MEMORY] fix beep sound
+
+
+6/7/2023
+
+[VM/UPD765A] fix sence devstat when drive is empty and force ready is performed
+
+[M23/MEMBUS] fix to disable interrupt when jump to another memory bank
+
+
+6/4/2023
+
+[VM/EVENT] improve to drive vline event as normal event
+[VM/Z80] simplify code to drive virtual machine in m1/read/write cycle
+[VM/Z80] improve to check interrupt after wait signai is inactivated
+[VM/Z80] support to disable interrupt
+[VM/Z80CTC] improve Z80 daisy chain routine
+[VM/Z80DMA] improve Z80 daisy chain routine
+[VM/Z80PIO] improve Z80 daisy chain routine
+[VM/Z80SIO] improve Z80 daisy chain routine
+
+[M23/MEMBUS] fix to disable interrupt when access another memory bank
+[MZ2500/INTERRUPT] improve Z80 daisy chain routine
+
+
+5/30/2023
+
+[MZ2500/CRTC] fix text vblank signal when vdisp pos is equal to vblank pos
+
+
+5/29/2023
+
+[VM/MB8877] improve for mix-density disk
+[VM/T3444A] improve for mix-density disk
+[VM/UPD765A] improve for mix-density disk
+[VM/UPD7220] remove ugly hack to keep pitch value for QC-10
+
+[FM16BETA/MAIN] support switching floppy drive density
+[FMR30/FLOPPY] support switching floppy drive density
+[FMR50/FLOPPY] support switching floppy drive density
+[M23/FLOPPY] fix switching floppy drive density (thanks Mr.Tsunozemi)
+[MZ1500/FLOPPY] support switching floppy drive density
+[MZ1500/QUICKDISK] improve not to stop playing seek noise
+[MZ2500/FLOPPY] support switching floppy drive density
+[MZ2800/FLOPPY] support switching floppy drive density
+[PC8801/PC88] improve screen renderer for PDDOS
+[SMC70/MEMORY] support switching floppy drive side
+[X1TURBO/DISPLAY] improve to render text screen in every vline (thanks Mr.Sato)
+[X1TURBO/FLOPPY] support switching floppy drive density and rpm
+
+
+1/28/2023
+
+[PC98HA] support docking station
+
+
+1/24/2023
+
+[VM/UPD7220] fix EGC access issue
+[VM/UPD7220] fix PITCH and VECTW to consider DGD flag
+
+[PC9801/DISPLAY] improve to notify EGC access mode to GDC
+
+
+1/22/2023
+
+[VM/I386_NP21] update to Neko Project 21/W ver0.86 rev88 beta5
+[VM/UPD7220] fix replace operation in pset
+
+[PC98LT] support serial MIDI port
+[PC98LT/FLOPPY] improve 2DD/2HD mode switching
+[PC98LT/FLOPPY] support timer irq
+
+
+12/31/2022
+
+[MZ1500/QUICKDISK] support to play seek noise
+[PC9801/MOUSE] improve mouse counter
+
+
+12/30/2022
+
+[VM/I386_NP21] update to Neko Project 21/W ver0.86 rev88 beta4
+
+
+12/29/2022
+
+[PC9801/DISPLAY] fix renderer to consider timing of line counter controller
+[PC9801/DISPLAY] fix blink and reverse attributes
+
+
+12/24/2022
+
+[VM/YM2203] support to force port a/b into input mode
+
+[PC9801/DISPLAY] fix crash issue when cr < pitch
+[PC9801/DISPLAY] improve for the case cr=40 and pitch=80
+[PC9801/JOYSTICK] improve to update port status when selection is changed
+
+
+12/22/2022
+
+[VM/DISK] improve for big endian environment
+[VM/DISK] support T98-NEXT nfd r1 floppy disk image
+[VM/DISK] support enhanced d88 format (.d8e) for unstable sector data
+[VM/MB8877] support unstable sector data
+[VM/UPD765A] support unstable sector data
+
+
+12/17/2022-2
+
+[VM/I8237] fix verify operation
+[VM/I8237] fix bus reqeust period
+
+
+12/17/2022
+
+[VM/UPD765A] revirt fixes in 1/17/2021
+[VM/UPD7220] fix to consider PITCH to draw line
+
+[PC9801/DISPLAY] fix renderer to consider PITCH, C/R, C/L, L/R of GDC
+[PC9801/DISPLAY] fix renderer to consider timing of line counter controller
+[PC9801/FLOPPY] ignore AIE signal in write control register
+
+
+12/4/2022
+
+[VM/DEVICE] fix dma accessor with wait redirect to dma accessor without wait
+[VM/I86] support memory/io wait
+[VM/I286] support memory/io wait
+[VM/I386_NP21] support memory/io wait
+[VM/I8080] fix not to access 16bit memory bus
+[VM/I8237] improve timing of bus request and accessing memory/io
+[VM/I8253] avoid HAS_I8254 definition
+[VM/I8259] avoid I8259_MAX_CHIPS definition
+[VM/IO] improve for accessing 16/32bit bus
+[VM/MEMORY] improve for accessing 16/32bit bus
+[VM/UPD7220] improve to consider plane size
+[VM/UPD7801] fix not to access 16bit memory bus
+[VM/UPD71071] improve timing of bus request and accessing memory/io
+[VM/Z80] improve not to change IX/IY values in software reset
+
+[FMR30/MEMBUS] improve for accessing 16bit bus
+[MZ5500] support memory/io wait
+[MZ5500/MEMBUS] improve for accessing 16bit bus
+[PC9801] support memory/io wait
+[PC9801/CPUREG] improve for cycles while DMA has bus master
+[PC9801/MEMBUS] simplify code
+[PC98HA/MEMBUS] improve for accessing 16bit bus
+
+
+11/20/2022
+
+[VM/I8251] fix to make tx ready in reset
+
+
+11/17/2022
+
+[PC9801/CPUREG] fix A20 mask for 32bit cpu
+[PC9801/DISPLAY] revirt EGC improvement in 12/18/2020
+[PC9801/DISPLAY] fix issue when text screen splitted by GDC SCROLL command
+[PC9801/MEMBUS] fix ram window when mapped address is upper than fa0000h
+
+
+11/14/2022
+
+[VM/I8255] fix mode #1
+
+[PC8801] support PC-8801-16 (16bit board)
+
+[PC9801] fix to always enable 2HD FDD I/F on first PC-9801
+[PC9801] improve default dipswitch value
+
+
+11/12/2022
+
+[PC8801] fix crash issue when 5inch drives are disconnected
+[PC8801/PC88] PC-8801 and PC-8801mk2 support 400 line mode
+
+[PC9801/DISPLAY] fix default memory switch value in hireso mode
+[PC9801/DISPLAY] fix memory swtich when sound BIOS is disabled
+
+
+10/14/2022
+
+[MZ2500/CRTC] fix vblank signal for GDEVS = GDEVE case
+
+
+10/12/2022
+
+[MZ1500] fix irq issue
+
+
+9/30/2022
+
+[VM/Z80] fix for DI,EI,EI,DI case
+
+[PC9801/DISPLAY] fix scroll register
+
+
+9/11/2022
+
+[VM/SCSI_DEV] fix delay to raise REQ signal after ACK is raised
+
+
+9/9/2022
+
+[EMU/DEBUGGER] show hint message for ? command
+
+[VM/EVENT] improve to drive virtual machine while executing one cpu opecode
+[VM/PCM8BIT] improve sound generation quality (thanks Mr.Sato)
+[VM/Z80] improve to drive virtual machine in m1/read/write cycle
+[VM/Z80] support wait signal
+
+[MZ2500] improve i/o access wait in 4MHz mode
+[MZ2500/CRTC] improve hsync/vsync timing
+[MZ2500/MEMORY] fix enbug around bank page of pcg and kanji rom
+[MZ2500/MEMORY] improve memory access wait in 4MHz mode
+[MZ2500/MEMORY] improve memory access wait by blanking signals
+
+[PC8801] improve JAST SOUND volume (thanks Mr.Sato)
+[X1] improve JAST SOUND volume (thanks Mr.Sato)
+
+
+8/30/2022
+
+[MZ2200/KEYBOARD] change key assign for SFTLOCK from CapsLock to Ctrl
+[MZ2500] support MZ-2000/80B mode
+
+
+8/27/2022
+
+[VM/I386_NP21] fix DOSBOX FPU code
+[VM/SCSI_DEV] fix inquiry command to send product revision
+
+[MZ700] support MZ-1E05/MZ-1E14/MZ-1R12
+[MZ800/MEMORY] improve vram wait
+
+[PC9801] support dip switch #2
+[PC9801/DISPLAY] improve to save/load memory switch
+
+
+7/27/2022
+
+[WINMAIN] improve to release emulation core when Windows shuts down
+
+
+7/9/2022
+
+[MZ700] support SHARP MZ-700 (PAL)
+[MZ700/MEMORY] improve timing of CRTC signals (thanks Mr.Koucha-Youkan, Mr. hlide fremen)
+
+
+7/8/2022
+
+[VM/I8251] support outputting RTS signal
+[VM/PCM8BIT] rename SPEAKER class to PCM8BIT
+
+[PC8801] support JAST SOUND
+[PC9801] support serial MIDI port
+[PC9801/SERIAL] support irq from serial port
+[X1] support JAST SOUND
+
+
+7/3/2022
+
+[WIN32/MIDI] support MIDI device
+
+[VM/DISK] support solid images that has 1st track with different format
+[VM/DISK] support solid image for SORD M68
+[VM/MIDI] support MIDI port device
+[VM/SPEAKER] support analog speaker device
+[VM/TMPZ84C015] support TMPZ84C015 and TMPZ84C013
+[VM/Z80CTC] support ZC/TO3 output for TMPZ84C015 and TMPZ84C013
+
+[TRNJR] support ESP TRN Junior
+
+
+6/8/2022
+
+[CRC80] support Computer Research CRC-80
+
+
+5/29/2022
+
+[M23/DISPLAY] add pseudo jis font image
+
+
+5/28/2022
+
+[VM/MB8877] support to get if disk is changed
+[VM/Z80CTC] improve to raise irq in more precise frequency
+
+[M23] improve not to show busy in fdc status after seek command finished
+[M23] fix frequency of input clock to Z80CTC
+[M23] fix daisy chain order of Z80 family chips
+[M23/KEYBOARD] fix key map table
+[M23/KEYBOARD] support input port 0xEF to get keyboard type
+
+
+5/25/2022
+
+[WINMAIN] support showing indicator LEDs on status bar for any purposes
+
+[VM/MB8877] support ready signal
+[VM/Z80CTC] improve for timer overrun case
+[VM/Z80SIO] improve receive interrupt (thanks Mr.YAT)
+
+[M23] support SORD M23
+[MYCOMZ80A] support floppy drives and nmi signal
+
+
+5/7/2022
+
+[VM/I8080] fix issue in the case CALL/RST performed by interrupt while halted
+
+[EX80BS] support TOSHIBA EX-80BS (eEX-80 is renamed to eEX-80BS)
+
+
+4/9/2022
+
+[COMMON] avoid C5208 and C26495 warnings on VC++2019 (thanks Mr.Meister)
+[EMU/DEBUGGER] support mount and unmount image files
+
+[PC8801MA/FLOPPY] support changing access lamp of floppy drives
+[SMC777/MEMORY] improve screen renderer for scrolling
+[SMC777/MEMORY] improve joystick port not to keep trigger#2 pressed
+[SMC777/MEMORY] improve for key releasingg
+
+
+4/5/2022
+
+[COMMON/FILEIO] improve functions for flush and wchar_t/char accessors
+[EMU/DEBUGGER] support save_state and load_state
+[EMU/WIN32] support changing access lamp of floppy drives
+[WIN32/CONSOLE] support telnet client
+[WIN32/SCREEN] fix to reinitialize Direct3D9 when device is lost
+
+[VM/Z80DMA] support enable after reti command (thanks Mr.Sato)
+[VM/Z80DMA] support interrupt on ready when WR3 is written (thanks Mr.Sato)
+
+[FX9000P] support CASIO FX-9000P
+[X1/DISPLAY] fix smooth vertical scroll
+[X1TURBO/FLOPPY] improve motor on signal for spindle-up delay
+[X1TURBO/FLOPPY] support changing access lamp of floppy drives
+
+
+12/30/2021
+
+[VM/DATAREC] support to enable/disable playing signal and voice separately
+[VM/I386_NP21] fix DAA/DAS/AAA/AAS/AAM/AAD based on DOSBox
+[VM/I386_NP21] fix SHLD/SHRD for n > 15 case
+[VM/I386_NP21] fix FCOM/FCOMI/FXAM for NaN and INF cases
+[VM/I386_NP21] fix FDECSTP/FINCSTP to clear C1 flag
+[VM/I386_NP21] fix FLD to set/clear C1 flag when stack overflow occurs or not
+[VM/I386_NP21] fix FSTENV/FLDENV/FSAVE/FLDENV to consider data16 prefix
+[VM/Z80DMA] fix not to enter too long loop (thanks Mr.YAT)
+
+[BX1] add keyboard and display artwork
+[MZ80K/MEMORY] fix v-gate signal (thanks Mr.Hlide Fremen)
+[MZ700/MEMORY] fix vblank signal timing (thanks Mr.Koucha-Youkan)
+[PC6001] remove some codes from iP6 Plus (thanks Mr.tanam)
+[PHC25/KEYBOARD] support _ and kana key
+[PHC25/SYSTEM] support GM1 signal (thanks Mr.Moroboshi)
+
+
+5/2/2021
+
+[VM/DATAREC] fix mixing sound track
+[VM/HD46505] support smooth vertical scroll
+[VM/MC6843] fix seek command
+[VM/MC6844] fix data chain register to consider 2/4 channel select bit
+[VM/MC6844] fix to transfer 64K when byte count register is zero
+[VM/Z80CTC] fix to apply written time constant just after reset bit is cleared
+
+[BX1] fix memory map around ram
+[BX1] support cartridge rom images
+[BX1/DISPLAY] add missing font patterns
+[BX1/FLOPPY] support i/o ports around fdc
+[BX1/KEYBOARD] support PROG.SELECT switch
+[BX1/PRINTER] support AUTO PRINT switch
+[MZ1500/JOTSTICK] support joystick (thanks Mr.Koucha-Youkan)
+[PC6001] remove some codes from iP6 Plus (thanks Mr.tanam)
+[X1TURBO/DISPLAY] support smooth vertical scroll
+
+
+2/7/2021
+
+[WINMAIN] improve WM_KEYDOW/WM_KEYUP events for VK_PROCESSKEY case
+[WIN32/CONSLE] improve routine to change console size
+
+[VM/DISK] fix density flag when loading solid image with fm sectors
+[VM/MC6843] fix track zero flag in STRA
+[VM/MC6843] fix seek error flag in STRB
+[VM/MC6843] fix seek command
+
+[BX1/DISPLAY] improve for drawing digitron display
+[BX1/KEYBOARD] improve I/O ports for detecting key pressed/released
+[BX1/PRINTER] add ugly patch for printer process
+
+
+1/24/2021
+
+[VM/I8279] support 8279 (based on MAME)
+
+[MP85] support MITEC MP-85
+
+
+1/17/2021
+
+[VM/UPD765A] improve for the case tc is asserted while reading/writing sector
+
+[PC8801/PC88] improve to render screen with port params at end of disp timing
+[X1TURBO/FLOPPY] fix to change type of all drives (thanks Mr.Sato)
+
+
+1/3/2021
+
+[WINMAIN] improve for pressing shift key and numpad key
+
+[MZ80K] fix roman/kana conversion
+[MZ80K/KEYBOARD] improve for pressing right shift key and numpad key
+
+
+12/31/2020
+
+[PC8801/PC88] improve crtc to refer reverse setting in start display command
+
+
+12/21/2020
+
+[VM/SCSI_CDROM] fix start frame of CD-DA playing when track number is specified
+
+[PCENGINE/PCE] fix issue that ADPCM is mistakenly looped
+
+
+12/19/2020
+
+[VM/SCSI_CDROM] fix pre-gap of first track when it is audio track
+
+
+12/18/2020
+
+[VM/SCSI_CDROM] improve routine to get start/end frame of CD-DA playing
+
+[PC8801/PC88] support 8inch DMA-type floppy drives for PC-8001mkII/SR
+[PC9801/DISPLAY] improve EGC (thanks Mr.Ryuji Okamoto)
+
+
+12/16/2020
+
+[PC8801/DISKIO] improve to read/write files in initial current directory
+[PC8801/PC88] support force ready/drq mask register for DMA-type FDD
+[PC8801/PC88] fix PC-8001mkIISR hiragana font when PCG-8100 is enabled
+
+
+12/15/2020
+
+[PC8801/DISKIO] support M88 DiskDrv (thanks Mr.CISC and Mr.apaslothy)
+[PC8801/PC88] support PC-8001mkIISR hiragana font
+[PC8801/PC88] support to disable 5inch/8inch-FDD interfaces
+[PC8801/PC88] support to disable updating scan line setting automatically
+[PC8801/PC88] fix mouse data when position is not latched
+
+
+12/14/2020
+
+[PC8801/PC88] support 8inch DMA-type floppy drives
+
+
+12/13/2020
+
+[VM/MC6843] support MC6843 (based on MAME)
+[[VM/SCSI_CDROM] fix to reset logical block size in Test Unit Ready command
+
+[BX1] support CANON BX-1 (not work)
+[MZ1500/QUICKDISK] improve for BSD record (thanks Mr.Motochan1500)
+[PC8801/PC88] fix hireso graphic screen when scan line is disabled
+
+
+12/12/2020
+
+[PC8801/PC88] fix to clear attibutes at starting new frame
+[PC8801/PC88] fix to read status of 2nd OPNA
+
+
+12/11/2020
+
+[PC8801/PC88] fix to run dma from memory to crtc when (rd,wr)=(0,0)
+[PC8801/PC88] fix to run dma from scsi to memory only when count > 0
+
+
+12/8/2020
+
+[COMMON] fix build error on VC++2019 (thanks Mr.Sato)
+
+[VM/Z80CTC] fix not to clear in-service at software reset (thanks Mr.Sato)
+[VM/Z80DMA] fix stall cycles at BUSACK in byte mode (thanks Mr.Sato)
+
+[X1TURBOZ/DISPLAY] fix zpalette in 64 colors, 2 screens mode (thanks Mr.Sato)
+
+
+12/6/2020-2
+
+[MZ1500] fix inp(0xe8) to detect voice board is missing (thanks Mr.kitahei88)
+[X1TURBOZ/DISPLAY] fix to update zpalette at vline=0 (thanks Mr.Sato)
+
+
+12/6/2020
+
+[OSD/WIN32] import Unity plug-in code (thanks Mr.Marukun)
+
+[VM/I386_NP21] update to Neko Project 21/W ver0.86 rev79 beta4
+[VM/UPD765A] fix transfer size to 128 << min(N, 7) (thanks Mr.Kugimoto)
+
+[MZ1500/QUICKDISK] improve for QDF format (thanks Mr.kitahei88)
+[MZ1500/QUICKDISK] improve for BSD record (thanks Mr.Yuushi)
+[PC9801/MEMORY] fix switching BIOS ROM/RAM
+[X1/CZ8RB] support CZ-8RB (thanks Mr.Meister)
+
+
+8/16/2020
+
+[VM/SCSI_DEV] improve to specify data req signal delay (thanks Mr.Sato)
+[VM/SCSI_DEV] fix read6/write6 command in 0 length case (thanks Mr.Sato)
+[VM/SISI_HDD] change drive type to hot swappable
+[VM/SISI_HDD] improve seek time (thanks Mr.Sato)
+[VM/SASI_HDD] support winchester drive parameters command
+[VM/Z80DMA] improve to sense rdy signal as level, not edge (thanks Mr.Sato)
+
+[MZ2500/CRTC] fix sub plane address in 640x200 16colors mode (thanks Mr.856)
+[SVI3X8] support SPECTRAVIDEO SVI-3x8 (thanks Mr.tanam)
+[X1] add menu items for FD2/FD3 (thanks Mr.Sato)
+[X1/DISPLAY] fix high speed pcg definition (thanks Mr.YAT)
+[X1TURBOZ/DISPLAY] improve palette update timing (thanks Mr.Sato)
+
+
+8/14/2020
+
+[OSD/WIN32] support x64 build (thank Mr.Marukun)
+[OSD/WIN32] support Direct2D
+
+[MICOM_MAHJONG] support Nippon Mail Service MICOM MAHJONG (thanks Mr.GORRY)
+[TVBOY] support GAKKEN TV BOY (thanks Mr.tanam)
+
+
+4/6/2020
+
+[VM/I386_NP21] update to Neko Project 21/W ver0.86 rev72
+
+
+2/21/2020
+
+[VM/I386_NP21] update to Neko Project 21/W ver0.86 rev71 beta4
+
+[PC9801VX] support to switch cpu mode to V30
+[PC9801RA] support to switch cpu mode to V30
+
+
+2/17/2020
+
+[EMU] add is_floppy_disk_connected() and is_quick_disk_connected()
+[WINMAIN] disable floppy/quick disk drive menus when drives are disconnected
+
+[VM/I8080] improve disassembler to distinguish 8080 and 8085
+[VM/I86] split i86/i88/i186/v30 from I286 class
+[VM/I86] fix aam in v30
+[VM/I86] support 8080 emulation mode in V30
+[VM/I386_NP21] improve not to explicitly accept irq while executing opecode
+[VM/I386_DASM] split i386 disassembler from I286/I386 class
+[VM/V30_DASM] split v30 disassembler from I286 class
+[VM/V30_DASM] add 8080 disassebler for 8080 emulation mode
+[VM/VM_TEMPLATE] add is_floppy_disk_connected() and is_quick_disk_connected()
+
+[PC9801] support to enable/disable 1MB/640K/320KB-FDD interfaces
+
+
+2/1/2020
+
+[EMU] support to create blank hard disk image (*.hdi/*.nhd)
+[WINMAIN] add menu items to mount blank hard disk image
+
+[VM/DEVICE] improve memory/io bus interfaces for 16/32bit access
+[VM/DEVICE] add get_event_clocks() and get_cpu_clocks()
+[VM/EVENT] add get_event_clocks() and get_cpu_clocks()
+[VM/I386_NP21] support 80386 (based on Neko Project 21/W i386 core)
+[VM/I8259] make update_intr() public
+[VM/MEMORY] improve memory bus interfaces for 16/32bit access
+[VM/MEMORY] make rd_table/wr_table/addr_shift public
+[VM/UPD7220] fix stop command (thanks Neko Project 21/W)
+
+[FMR50] change i386 core from MAME to Neko Project 21/W
+[FMR50] support to mount blank hard disk image
+[MZ2500] support to mount blank hard disk image
+[MZ2800] support to mount blank hard disk image
+[PC9801] change i386 core from MAME to Neko Project 21/W
+[PC9801] support to mount blank hard disk image
+[PC9801/DISPLAY] improve code for big-endian host machine
+[PC9801/FMSOUND] support 86-type PCM (thanks Neko Project 21/W)
+[PC9801/MEMBUS] improve memory bus interfaces for 16/32bit access
+[PC9801/MOUSE] fix irq number in hireso mode
+[PC9801/SASI] improve irq/drq signals to generate from sasi bus signals
+[X1TURBO] support to mount blank hard disk image
+[X1TURBO/IOBUS] fix not to clear vram in reset()
+
+
+1/23/2020
+
+[VM/Z80DMA] fix byte counter read by read mask follows command (thanks Mr.Sato)
+
+
+12/31/2019
+
+[MZ2500/CRTC] apply crtc patch (thanks Mr.Koucha-Youkan)
+
+
+11/3/2019
+
+[PC98RL] fix horizontal frequency
+[PC98RL/DISPLAY] fix not to change horizontal frequency
+[PC98RL/DISPLAY] fix cg window
+[PC98RL/DISPLAY] fix multiple vram planes accessing
+[PC9801/DISPLAY] fix vram word accessing (thanks Mr.Artane.)
+
+
+10/28/2019
+
+[X1/PSUB] improve tape recording
+[X1/SUB] improve tape stopping
+[X1/SUB] improve tape write-protected signal
+
+
+10/22/2019
+
+[X1/PSUB] improve tape end signal
+[X1/SUB] improve tape end signal
+
+
 4/30/2019
 
 [VM/DEVICE] add is_primary_cpu() and update_extra_event()

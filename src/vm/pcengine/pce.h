@@ -8,7 +8,7 @@
 	Author : Takeda.Toshiya
 	Date   : 2009.03.11-
 
-	[ PC-Eninge ]
+	[ PC-Engine ]
 */
 
 #ifndef _PCE_H_

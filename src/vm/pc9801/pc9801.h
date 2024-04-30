@@ -104,7 +104,12 @@
 	#define PIT_CLOCK_5MHZ
 //	#define CPU_CLOCKS		7987248
 //	#define PIT_CLOCK_8MHZ
-	#define USE_CPU_TYPE		2
+	#if defined(_PC9801VX)
+		#define USE_CPU_TYPE		4
+		#define HAS_SUB_V30
+	#else
+		#define USE_CPU_TYPE		2
+	#endif
 #elif defined(_PC98XA)
 	#define DEVICE_NAME		"NEC PC-98XA"
 	#define CONFIG_NAME		"pc98xa"
@@ -124,7 +129,12 @@
 	#define PIT_CLOCK_5MHZ
 //	#define CPU_CLOCKS		15974496
 //	#define PIT_CLOCK_8MHZ
-	#define USE_CPU_TYPE		2
+	#if defined(_PC9801RA)
+		#define USE_CPU_TYPE		4
+		#define HAS_SUB_V30
+	#else
+		#define USE_CPU_TYPE		2
+	#endif
 #else
 	// unknown machines
 #endif
@@ -167,24 +177,20 @@
 
 #if defined(HAS_I286)
 	#define SUPPORT_24BIT_ADDRESS
-#elif defined(HAS_I386) || defined(HAS_I486)
+#elif defined(HAS_I386) || defined(HAS_I486SX) || defined(HAS_I486DX)
 	#define SUPPORT_32BIT_ADDRESS
+	#define SUPPORT_32BIT_DATABUS
 	#if !defined(SUPPORT_HIRESO)
 		#define SUPPORT_BIOS_RAM
 	#endif
 	// PC-9801-86
 	#define SUPPORT_PC98_OPNA
-#endif
-#if defined(SUPPORT_24BIT_ADDRESS) || defined(SUPPORT_32BIT_ADDRESS)
-	#define MEMORY_ADDR_MAX		0x1000000	// 16MB
-#else
-	#define MEMORY_ADDR_MAX		0x100000	// 1MB
+	#define SUPPORT_PC98_86PCM
+	#define SUPPORT_PC98_86PCM_IRQ
 #endif
 //#if defined(SUPPORT_32BIT_ADDRESS)
 //	#define SUPPORT_SYSTEM_16MB
 //#endif
-#define MEMORY_BANK_SIZE		0x800
-#define IO_ADDR_MAX			0x10000
 
 #if defined(_PC98DO) || defined(_PC98DOPLUS)
 	#define PC8801_VARIANT
@@ -205,6 +211,9 @@
 #if defined(_PC98DOPLUS)
 	#define SUPPORT_PC88_OPNA
 #endif
+	#define SUPPORT_PC88_JAST
+	#define SUPPORT_QUASIS88_CMT
+	#define SUPPORT_M88_DISKDRV
 #endif
 
 // device informations for virtual machine
@@ -226,29 +235,38 @@
 #if defined(_PC98DO) || defined(_PC98DOPLUS)
 #define PC80S31K_NO_WAIT
 #endif
-#define UPD7220_MSB_FIRST
+#if !defined(SUPPORT_HIRESO)
 #define UPD7220_HORIZ_FREQ	24830
-#if defined(_PC98DO) || defined(_PC98DOPLUS)
-#define Z80_MEMORY_WAIT
+#else
+#define UPD7220_HORIZ_FREQ	32860
 #endif
-#define I8259_MAX_CHIPS		2
+#define UPD7220_MSB_FIRST
 #define SINGLE_MODE_DMA
 #define OVERRIDE_SOUND_FREQ_48000HZ	55467
 
 // device informations for win32
 #if defined(_PC9801) || defined(_PC9801E)
 #define USE_FLOPPY_DISK		6
+#define DIPSWITCH_2HD		0x01
+#define DIPSWITCH_2DD		0x02
+#define DIPSWITCH_2D		0x04
+#define DIPSWITCH_DEFAULT_LO	(DIPSWITCH_2HD + DIPSWITCH_2DD + DIPSWITCH_2D)
 #elif defined(_PC98DO) || defined(_PC98DOPLUS)
 #define USE_BOOT_MODE		5
-#define USE_DIPSWITCH
 #define DIPSWITCH_MEMWAIT	0x01
 #define DIPSWITCH_CMDSING	0x10
-#define DIPSWITCH_DEFAULT	(/*DIPSWITCH_HMB20 + DIPSWITCH_GSX8800 + DIPSWITCH_PCG8100 + */DIPSWITCH_CMDSING)
 #define DIPSWITCH_PALETTE	0x20
+#define DIPSWITCH_M88_DISKDRV	0x100
+#define DIPSWITCH_QUASIS88_CMT	0x200
+#define DIPSWITCH_DEFAULT_LO	(/*DIPSWITCH_HMB20 + DIPSWITCH_GSX8800 + DIPSWITCH_PCG8100 + */DIPSWITCH_CMDSING)
 #define USE_FLOPPY_DISK		4
 #else
+#define DIPSWITCH_DEFAULT_LO	0
 #define USE_FLOPPY_DISK		2
 #endif
+#define USE_DIPSWITCH
+#define DIPSWITCH_DEFAULT_HI	(4 | 8 | 16)
+#define DIPSWITCH_DEFAULT	(DIPSWITCH_DEFAULT_LO | (DIPSWITCH_DEFAULT_HI << 16))
 #if defined(SUPPORT_SASI_IF) || defined(SUPPORT_SCSI_IF) || defined(SUPPORT_IDE_IF)
 #define USE_HARD_DISK		2
 #endif
@@ -270,27 +288,51 @@
 #define USE_SCANLINE
 #define USE_SCREEN_FILTER
 #define USE_SOUND_TYPE		5
-#if defined(_PC98DO) || defined(_PC98DOPLUS)
-#if    defined(SUPPORT_PC98_OPNA) &&  defined(SUPPORT_PC88_OPNA)
-#define USE_SOUND_VOLUME	(4 + 1 + 1 + 4 + 1 + 1)
-#elif  defined(SUPPORT_PC98_OPNA) && !defined(SUPPORT_PC88_OPNA)
-#define USE_SOUND_VOLUME	(4 + 1 + 1 + 2 + 1 + 1)
-#elif !defined(SUPPORT_PC98_OPNA) &&  defined(SUPPORT_PC88_OPNA)
-#define USE_SOUND_VOLUME	(2 + 1 + 1 + 4 + 1 + 1)
-#elif !defined(SUPPORT_PC98_OPNA) && !defined(SUPPORT_PC88_OPNA)
-#define USE_SOUND_VOLUME	(2 + 1 + 1 + 2 + 1 + 1)
-#endif
-#else
 #if defined(SUPPORT_PC98_OPNA)
-#define USE_SOUND_VOLUME	(4 + 1 + 1 + 1)
+	#if defined(SUPPORT_PC98_86PCM)
+		#define SOUND_VOLUME_PC98_86PCM	1
+	#endif
+	#define SOUND_VOLUME_PC98_OPN		4
 #else
-#define USE_SOUND_VOLUME	(2 + 1 + 1 + 1)
+	#define SOUND_VOLUME_PC98_OPN		2
 #endif
+#if defined(_PC98DO) || defined(_PC98DOPLUS)
+	#if defined(SUPPORT_PC88_OPNA)
+		#define SOUND_VOLUME_PC88_OPN1	4
+	#else
+		#define SOUND_VOLUME_PC88_OPN1	2
+	#endif
+	#if defined(SUPPORT_PC88_JAST)
+		#define SOUND_VOLUME_PC88_JAST	1
+	#endif
+	#define SOUND_VOLUME_PC88_BEEP		1
 #endif
+#ifndef SOUND_VOLUME_PC98_86PCM
+	#define SOUND_VOLUME_PC98_86PCM		0
+#endif
+#ifndef SOUND_VOLUME_PC88_OPN1
+	#define SOUND_VOLUME_PC88_OPN1		0
+#endif
+#ifndef SOUND_VOLUME_PC88_JAST
+	#define SOUND_VOLUME_PC88_JAST		0
+#endif
+#ifndef SOUND_VOLUME_PC88_BEEP
+	#define SOUND_VOLUME_PC88_BEEP		0
+#endif
+#define USE_SOUND_VOLUME	(SOUND_VOLUME_PC98_OPN + SOUND_VOLUME_PC98_86PCM + 2 + SOUND_VOLUME_PC88_OPN1 + SOUND_VOLUME_PC88_JAST + SOUND_VOLUME_PC88_BEEP + 1)
 #define USE_JOYSTICK
 #define USE_MOUSE
+#define USE_MIDI
 #define USE_PRINTER
+#if (defined(_PC98DO) || defined(_PC98DOPLUS)) && defined(SUPPORT_PC88_JAST)
+#define USE_PRINTER_TYPE	4
+#else
 #define USE_PRINTER_TYPE	3
+#endif
+#define PRINTER_TYPE_DEFAULT	(USE_PRINTER_TYPE - 1)
+#define USE_SERIAL
+#define USE_SERIAL_TYPE		4
+#define SERIAL_TYPE_DEFAULT	(USE_SERIAL_TYPE - 1)
 #define USE_DEBUGGER
 #define USE_STATE
 
@@ -300,20 +342,26 @@
 
 #ifdef USE_SOUND_VOLUME
 static const _TCHAR *sound_device_caption[] = {
-#if defined(SUPPORT_PC98_OPNA)
-	_T("OPNA (FM)"), _T("OPNA (PSG)"), _T("OPNA (ADPCM)"), _T("OPNA (Rhythm)"),
-#else
-	_T("OPN (FM)"), _T("OPN (PSG)"),
-#endif
+	#if defined(SUPPORT_PC98_OPNA)
+		_T("OPNA (FM)"), _T("OPNA (PSG)"), _T("OPNA (ADPCM)"), _T("OPNA (Rhythm)"),
+		#if defined(SUPPORT_PC98_86PCM)
+			_T("86-Type PCM"),
+		#endif
+	#else
+		_T("OPN (FM)"), _T("OPN (PSG)"),
+	#endif
 	_T("PC-9801-14"), _T("Beep"),
-#if defined(_PC98DO) || defined(_PC98DOPLUS)
-#if defined(SUPPORT_PC88_OPNA)
-	_T("PC-88 (FM)"), _T("PC-88 (PSG)"), _T("PC-88 (ADPCM)"), _T("PC-88 (Rhythm)"),
-#else
-	_T("PC-88 (FM)"), _T("PC-88 (PSG)"),
-#endif
-	_T("PC-88 (Beep)"), 
-#endif
+	#if defined(_PC98DO) || defined(_PC98DOPLUS)
+		#if defined(SUPPORT_PC88_OPNA)
+			_T("PC-88 (FM)"), _T("PC-88 (PSG)"), _T("PC-88 (ADPCM)"), _T("PC-88 (Rhythm)"),
+		#else
+			_T("PC-88 (FM)"), _T("PC-88 (PSG)"),
+		#endif
+		#if defined(SUPPORT_PC88_JAST)
+			_T("PC-88 (JAST)"),
+		#endif
+		_T("PC-88 (Beep)"),
+	#endif
 	_T("Noise (FDD)"),
 };
 #endif
@@ -334,10 +382,15 @@ class I8251;
 class I8253;
 class I8255;
 class I8259;
-#if defined(HAS_I386) || defined(HAS_I486)
+#if defined(HAS_I386) || defined(HAS_I486SX) || defined(HAS_I486DX)
 class I386;
-#else
+#elif defined(HAS_I286)
 class I286;
+#else
+class I86;
+#endif
+#if defined(HAS_SUB_V30)
+class I86; // V30
 #endif
 class IO;
 class LS244;
@@ -376,6 +429,7 @@ class JOYSTICK;
 class KEYBOARD;
 class MEMBUS;
 class MOUSE;
+class SERIAL;
 #if defined(SUPPORT_SASI_IF)
 class SASI;
 #endif
@@ -396,6 +450,9 @@ class Z80;
 class PC80S31K;
 class PC88;
 class Z80;
+#ifdef SUPPORT_M88_DISKDRV
+class DiskIO;
+#endif
 #endif
 
 class VM : public VM_TEMPLATE
@@ -426,10 +483,15 @@ protected:
 	I8255* pio_sys;
 	I8255* pio_prn;
 	I8259* pic;
-#if defined(HAS_I386) || defined(HAS_I486)
+#if defined(HAS_I386) || defined(HAS_I486SX) || defined(HAS_I486DX)
 	I386* cpu;
-#else
+#elif defined(HAS_I286)
 	I286* cpu;
+#else
+	I86* cpu;
+#endif
+#if defined(HAS_SUB_V30)
+	I86* v30;
 #endif
 	IO* io;
 	LS244* rtcreg;
@@ -477,6 +539,7 @@ protected:
 	KEYBOARD* keyboard;
 	MEMBUS* memory;
 	MOUSE* mouse;
+	SERIAL* serial;
 #if defined(SUPPORT_SASI_IF)
 	SASI* sasi;
 #endif
@@ -514,7 +577,9 @@ protected:
 	I8255* pc88pio;
 	PCM1BIT* pc88pcm;
 	UPD1990A* pc88rtc;
+#ifdef SUPPORT_PC88_OPN1
 	YM2203* pc88opn1;
+#endif
 	Z80* pc88cpu;
 	
 	PC80S31K* pc88sub;
@@ -524,6 +589,10 @@ protected:
 	NOISE* pc88noise_head_down;
 	NOISE* pc88noise_head_up;
 	Z80* pc88cpu_sub;
+	
+#ifdef SUPPORT_M88_DISKDRV
+	DiskIO* pc88diskio;
+#endif
 	
 	int boot_mode;
 #endif
@@ -574,6 +643,9 @@ public:
 	// user interface
 	void open_floppy_disk(int drv, const _TCHAR* file_path, int bank);
 	void close_floppy_disk(int drv);
+#if defined(_PC9801) || defined(_PC9801E)
+	bool is_floppy_disk_connected(int drv);
+#endif
 	bool is_floppy_disk_inserted(int drv);
 	void is_floppy_disk_protected(int drv, bool value);
 	bool is_floppy_disk_protected(int drv);

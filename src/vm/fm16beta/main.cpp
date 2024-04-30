@@ -13,6 +13,9 @@
 #include "../disk.h"
 #include "../i8237.h"
 #include "../i8259.h"
+#ifdef HAS_I286
+#include "../i286.h"
+#endif
 #include "../mb8877.h"
 #include "../msm58321.h"
 #include "../pcm1bit.h"
@@ -172,6 +175,9 @@ void MAIN::write_io8(uint32_t addr, uint32_t data)
 		break;
 
 	case 0xfd34:
+		for(int i = 0; i < 4; i++) {
+			d_fdc_2hd->set_drive_mfm(i, ((data & 0x40) != 0));
+		}
 		d_fdc_2hd->write_signal(SIG_MB8877_SIDEREG, data, 0x01);
 		sidereg_2hd = data;
 		break;
@@ -310,7 +316,7 @@ void MAIN::write_signal(int id, uint32_t data, uint32_t mask)
 	} else if(id == SIG_MAIN_SUB_BUSY) {
 		sub_busy = ((data & mask) != 0);
 
-this->out_debug_log("SUB -> MAIN: SUB BUSY = %d\n", sub_busy);
+this->out_debug_log(_T("SUB -> MAIN: SUB BUSY = %d\n"), sub_busy);
 
 	} else if(id == SIG_MAIN_DRQ_2HD) {
 		drq_2hd = ((data & mask) != 0);

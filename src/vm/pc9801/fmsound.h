@@ -14,7 +14,7 @@
 	Author : Takeda.Toshiya
 	Date   : 2012.02.03-
 
-	[ PC-9801-26 ]
+	[ PC-9801-26/86 ]
 */
 
 #ifndef _FMSOUND_H_
@@ -24,18 +24,36 @@
 #include "../../emu.h"
 #include "../device.h"
 
+#ifdef SUPPORT_PC98_OPNA
+class FIFO;
+#endif
+
 class FMSOUND : public DEVICE
 {
 private:
 	DEVICE* d_opn;
-#ifdef SUPPORT_PC98_OPNA
-	uint8_t mask;
+#if defined(SUPPORT_PC98_OPNA)
+	uint8_t opna_mask;
+#if defined(SUPPORT_PC98_86PCM)
+	DEVICE *d_pic;
+	uint64_t pcm_clocks;
+	uint32_t pcm_prev_clock;
+	uint8_t pcm_vol_ctrl, pcm_fifo_ctrl, pcm_dac_ctrl, pcm_mute_ctrl;
+	int pcm_fifo_size;
+	bool pcm_fifo_written, pcm_overflow, pcm_irq_raised;
+	FIFO *pcm_fifo;
+	int pcm_register_id;
+	int pcm_sample_l, pcm_sample_r;
+	int pcm_volume, pcm_volume_l, pcm_volume_r;
+	
+	int get_sample();
+#endif
 #endif
 	
 public:
 	FMSOUND(VM_TEMPLATE* parent_vm, EMU* parent_emu) : DEVICE(parent_vm, parent_emu)
 	{
-#ifdef SUPPORT_PC98_OPNA
+#if defined(SUPPORT_PC98_OPNA)
 		set_device_name(_T("PC-9801-86 (FM Sound)"));
 #else
 		set_device_name(_T("PC-9801-26 (FM Sound)"));
@@ -44,12 +62,19 @@ public:
 	~FMSOUND() {}
 	
 	// common functions
-#ifdef SUPPORT_PC98_OPNA
+#if defined(SUPPORT_PC98_OPNA)
 	void reset();
+#if defined(SUPPORT_PC98_86PCM)
+	void initialize();
+	void release();
+	void event_callback(int event_id, int err);
+	void mix(int32_t* buffer, int cnt);
+	void set_volume(int ch, int decibel_l, int decibel_r);
+#endif
 #endif
 	void write_io8(uint32_t addr, uint32_t data);
 	uint32_t read_io8(uint32_t addr);
-#ifdef SUPPORT_PC98_OPNA
+#if defined(SUPPORT_PC98_OPNA)
 	bool process_state(FILEIO* state_fio, bool loading);
 #endif
 	
@@ -58,6 +83,16 @@ public:
 	{
 		d_opn = device;
 	}
+#if defined(SUPPORT_PC98_OPNA) && defined(SUPPORT_PC98_86PCM)
+	void set_context_pic(DEVICE* device)
+	{
+		d_pic = device;
+	}
+	void initialize_sound(int rate, double frequency, int volume)
+	{
+		pcm_volume = volume;
+	}
+#endif
 };
 
 #endif

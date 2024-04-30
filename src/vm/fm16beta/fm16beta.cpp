@@ -17,7 +17,11 @@
 #include "../i8237.h"
 #include "../i8251.h"
 #include "../i8259.h"
+#if defined(HAS_I186)
+#include "../i86.h"
+#elif defined(HAS_I286)
 #include "../i286.h"
+#endif
 #include "../io.h"
 #include "../mb8877.h"
 #include "../mc6809.h"
@@ -47,14 +51,22 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	event = new EVENT(this, emu);	// must be 2nd device
 	
 	crtc = new HD46505(this, emu);
+#if defined(HAS_I186)
+	cpu = new I86(this, emu);
+	cpu->device_model = INTEL_80186;
+#elif defined(HAS_I286)
 	cpu = new I286(this, emu);
+#endif
 	io = new IO(this, emu);
+	io->space = 0x10000;
+	io->bus_width = 16;
 	dma = new I8237(this, emu);
 #ifdef USE_DEBUGGER
 	dma->set_context_debugger(new DEBUGGER(this, emu));
 #endif
 	sio = new I8251(this, emu);
 	pic = new I8259(this, emu);
+	pic->num_chips = 2;
 	fdc_2hd = new MB8877(this, emu);
 	fdc_2hd->set_context_noise_seek(new NOISE(this, emu));
 	fdc_2hd->set_context_noise_head_down(new NOISE(this, emu));
@@ -71,12 +83,18 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	cmos = new CMOS(this, emu);
 	keyboard = new KEYBOARD(this, emu);
 	mainbus = new MAIN(this, emu);
-	
-
-	
-	
+#if defined(HAS_I186)
+	mainbus->space = 0x0100000; // 1MB
+#elif defined(HAS_I286)
+	mainbus->space = 0x1000000; // 16MB
+#endif
+	mainbus->bank_size = 0x4000;
+	mainbus->bus_width = 16;
 	
 	subbus = new SUB(this, emu);
+	subbus->space = 0x10000;
+	subbus->bank_size = 0x80;
+	subbus->bus_width = 8;
 	
 	// set contexts
 	event->set_context_cpu(cpu, 8000000);
@@ -90,7 +108,7 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	event->set_context_sound(fdc_2d->get_context_noise_head_up());
 	
 	keyboard->set_context_main(mainbus);
-#ifdef HAS_I286
+#if defined(HAS_I286)
 	mainbus->set_context_cpu(cpu);
 #endif
 	mainbus->set_context_dma(dma);
@@ -102,6 +120,7 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	mainbus->set_context_sub(subbus);
 	mainbus->set_context_keyboard(keyboard);
 
+	dma->set_context_cpu(cpu);
 	dma->set_context_memory(mainbus);
 	dma->set_context_ch0(fdc_2d);
 	dma->set_context_ch1(fdc_2hd);
@@ -131,8 +150,6 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	crtc->set_context_disp(subbus, SIG_SUB_DISP, 1);
 	crtc->set_context_vsync(subbus, SIG_SUB_VSYNC, 1);
 	
-	subbus->addr_max = 0x10000;
-	subbus->bank_size = 0x80;
 	subbus->set_context_crtc(crtc);
 	subbus->set_chregs_ptr(crtc->get_regs());
 	subbus->set_context_pcm(pcm);
@@ -158,7 +175,7 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	io->set_iomap_range_rw(0x0000, 0x0001, pic);
 	io->set_iomap_range_rw(0x0010, 0x001f, dma);
 	io->set_iomap_range_w(0x0020, 0x0023, mainbus);	// dma bank regs
-#ifdef HAS_I286
+#if defined(HAS_I286)
 	io->set_iomap_single_rw(0x0060, mainbus);		// reset
 #endif
 
@@ -391,7 +408,7 @@ void VM::update_config()
 	}
 }
 
-#define STATE_VERSION	2
+#define STATE_VERSION	3
 
 bool VM::process_state(FILEIO* state_fio, bool loading)
 {
@@ -399,8 +416,8 @@ bool VM::process_state(FILEIO* state_fio, bool loading)
 		return false;
 	}
 	for(DEVICE* device = first_device; device; device = device->next_device) {
-		const char *name = typeid(*device).name() + 6; // skip "class "
-		int len = strlen(name);
+		const _TCHAR *name = char_to_tchar(typeid(*device).name() + 6); // skip "class "
+		int len = (int)_tcslen(name);
 		
 		if(!state_fio->StateCheckInt32(len)) {
 			return false;

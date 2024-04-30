@@ -17,7 +17,7 @@
 #include "../i8253.h"
 #include "../i8255.h"
 #include "../i8259.h"
-#include "../i286.h"
+#include "../i86.h"
 #include "../io.h"
 #include "../mb8877.h"
 #include "../memory.h"
@@ -47,13 +47,19 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	pit = new I8253(this, emu);
 	pio = new I8255(this, emu);	// for system port
 	pic = new I8259(this, emu);
-	cpu = new I286(this, emu);
+	cpu = new I86(this, emu);
+	cpu->device_model = INTEL_8086;
 	io = new IO(this, emu);
+	io->space = 0x10000;
+	io->bus_width = 16;
 	fdc = new MB8877(this, emu);
 	fdc->set_context_noise_seek(new NOISE(this, emu));
 	fdc->set_context_noise_head_down(new NOISE(this, emu));
 	fdc->set_context_noise_head_up(new NOISE(this, emu));
 	memory = new MEMORY(this, emu);
+	memory->space = 0x100000;
+	memory->bank_size = 0x4000;
+	memory->bus_width = 16;
 	rtc = new MSM58321(this, emu);
 	not_pit = new NOT(this, emu);
 	pcm = new PCM1BIT(this, emu);
@@ -404,7 +410,7 @@ void VM::update_config()
 	}
 }
 
-#define STATE_VERSION	3
+#define STATE_VERSION	4
 
 bool VM::process_state(FILEIO* state_fio, bool loading)
 {
@@ -412,8 +418,8 @@ bool VM::process_state(FILEIO* state_fio, bool loading)
 		return false;
 	}
 	for(DEVICE* device = first_device; device; device = device->next_device) {
-		const char *name = typeid(*device).name() + 6; // skip "class "
-		int len = strlen(name);
+		const _TCHAR *name = char_to_tchar(typeid(*device).name() + 6); // skip "class "
+		int len = (int)_tcslen(name);
 		
 		if(!state_fio->StateCheckInt32(len)) {
 			return false;

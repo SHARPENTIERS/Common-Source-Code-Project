@@ -27,6 +27,9 @@ private:
 #if defined(_MZ800)
 	DEVICE *d_pio_int;
 #endif
+#if defined(_MZ700) || defined(_MZ1500)
+	DEVICE *d_joystick;
+#endif
 	
 	// memory
 	uint8_t* rbank[32];
@@ -37,8 +40,8 @@ private:
 	uint8_t ipl[0x1000];	// IPL 4KB
 #if defined(_MZ800)
 	uint8_t ext[0x2000];	// MZ-800 IPL 8KB
-#elif defined(_MZ1500)
-	uint8_t ext[0x1800];	// MZ-1500 EXT 6KB
+#else
+	uint8_t ext[0x1800];	// MZ-700/1500 EXT 6KB
 #endif
 	uint8_t font[0x1000];	// CGROM 4KB
 #if defined(_MZ700)
@@ -83,16 +86,19 @@ private:
 	uint8_t priority, palette[8];
 #endif
 	bool blink, tempo;
+	bool blank;
 	bool hblank, hsync;
 	bool vblank, vsync;
-#if defined(_MZ700) || defined(_MZ1500)
-	bool hblank_vram;
+	bool blank_vram;
+#if defined(_MZ800) || defined(_MZ1500)
+	bool blank_pcg;
 #endif
-#if defined(_MZ1500)
-	bool hblank_pcg;
-#endif
-	void set_vblank(bool val);
+	
+	void set_blank(bool val);
 	void set_hblank(bool val);
+	void set_hsync(bool val);
+	void set_vblank(bool val);
+	void set_vsync(bool val);
 	
 	// renderer
 #if defined(_MZ800)
@@ -154,6 +160,12 @@ public:
 	void set_context_pio_int(DEVICE* device)
 	{
 		d_pio_int = device;
+	}
+#endif
+#if defined(_MZ700) || defined(_MZ1500)
+	void set_context_joystick(DEVICE* device)
+	{
+		d_joystick = device;
 	}
 #endif
 	void draw_screen();

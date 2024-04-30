@@ -89,6 +89,7 @@ BEGIN
         MENUITEM "CPU x8",                      ID_CPU_POWER3
         MENUITEM "CPU x16",                     ID_CPU_POWER4
         MENUITEM "Full Speed",                  ID_FULL_SPEED
+        MENUITEM "Drive VM in M1/R/W Cycle",    ID_DRIVE_VM_IN_OPECODE
         MENUITEM SEPARATOR
         MENUITEM "Paste",                       ID_AUTOKEY_START
         MENUITEM "Stop",                        ID_AUTOKEY_STOP
@@ -180,7 +181,8 @@ BEGIN
         BEGIN
             MENUITEM "Play FDD Noise",          ID_VM_SOUND_NOISE_FDD
             MENUITEM "Play CMT Noise",          ID_VM_SOUND_NOISE_CMT
-            MENUITEM "Play CMT Sound",          ID_VM_SOUND_PLAY_TAPE
+            MENUITEM "Play CMT Signal",         ID_VM_SOUND_TAPE_SIGNAL
+            MENUITEM "Play CMT Voice",          ID_VM_SOUND_TAPE_VOICE
         END
         POPUP "Printer"
         BEGIN
@@ -241,6 +243,7 @@ BEGIN
             MENUITEM "Joystick To Keyboard",    ID_INPUT_JOYTOKEY
         END
         MENUITEM SEPARATOR
+        MENUITEM "Use Direct2D1",               ID_HOST_USE_D2D1
         MENUITEM "Use Direct3D9",               ID_HOST_USE_D3D9
         MENUITEM "Wait Vsync",                  ID_HOST_WAIT_VSYNC
         MENUITEM "Use DirectInput",             ID_HOST_USE_DINPUT
@@ -257,6 +260,7 @@ END
 
 IDI_BITMAP_ACCESS_OFF   BITMAP  DISCARDABLE     "indicator/access_off.bmp"
 IDI_BITMAP_ACCESS_ON    BITMAP  DISCARDABLE     "indicator/access_on.bmp"
+IDI_BITMAP_ACCESS_ON2   BITMAP  DISCARDABLE     "indicator/access_green.bmp"
 
 
 /////////////////////////////////////////////////////////////////////////////

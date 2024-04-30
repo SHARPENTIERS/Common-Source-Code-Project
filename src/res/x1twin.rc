@@ -91,6 +91,7 @@ BEGIN
         MENUITEM "CPU x8",                      ID_CPU_POWER3
         MENUITEM "CPU x16",                     ID_CPU_POWER4
         MENUITEM "Full Speed",                  ID_FULL_SPEED
+        MENUITEM "Drive VM in M1/R/W Cycle",    ID_DRIVE_VM_IN_OPECODE
         MENUITEM SEPARATOR
         MENUITEM "Paste",                       ID_AUTOKEY_START
         MENUITEM "Stop",                        ID_AUTOKEY_STOP
@@ -155,6 +156,34 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "Recent",                      ID_RECENT_FD2
     END
+    POPUP "FD2"
+    BEGIN
+        MENUITEM "Insert",                      ID_OPEN_FD3
+        MENUITEM "Eject",                       ID_CLOSE_FD3
+        MENUITEM "Insert Blank 2D Disk",        ID_OPEN_BLANK_2D_FD3
+        MENUITEM "Insert Blank 2DD Disk",       ID_OPEN_BLANK_2DD_FD3
+        MENUITEM "Insert Blank 2HD Disk",       ID_OPEN_BLANK_2HD_FD3
+        MENUITEM SEPARATOR
+        MENUITEM "Write Protected",             ID_WRITE_PROTECT_FD3
+        MENUITEM "Correct Timing",              ID_CORRECT_TIMING_FD3
+        MENUITEM "Ignore CRC Errors",           ID_IGNORE_CRC_FD3
+        MENUITEM SEPARATOR
+        MENUITEM "Recent",                      ID_RECENT_FD3
+    END
+    POPUP "FD3"
+    BEGIN
+        MENUITEM "Insert",                      ID_OPEN_FD4
+        MENUITEM "Eject",                       ID_CLOSE_FD4
+        MENUITEM "Insert Blank 2D Disk",        ID_OPEN_BLANK_2D_FD4
+        MENUITEM "Insert Blank 2DD Disk",       ID_OPEN_BLANK_2DD_FD4
+        MENUITEM "Insert Blank 2HD Disk",       ID_OPEN_BLANK_2HD_FD4
+        MENUITEM SEPARATOR
+        MENUITEM "Write Protected",             ID_WRITE_PROTECT_FD4
+        MENUITEM "Correct Timing",              ID_CORRECT_TIMING_FD4
+        MENUITEM "Ignore CRC Errors",           ID_IGNORE_CRC_FD4
+        MENUITEM SEPARATOR
+        MENUITEM "Recent",                      ID_RECENT_FD4
+    END
     POPUP "CMT"
     BEGIN
         MENUITEM "Play",                        ID_PLAY_TAPE1
@@ -176,6 +205,7 @@ BEGIN
     BEGIN
         MENUITEM "Mount",                       ID_OPEN_HD1
         MENUITEM "Unmount",                     ID_CLOSE_HD1
+        MENUITEM "Mount Blank 20MB Disk",       ID_OPEN_BLANK_20MB_HD1
         MENUITEM SEPARATOR
         MENUITEM "Recent",                      ID_RECENT_HD1
     END
@@ -183,6 +213,7 @@ BEGIN
     BEGIN
         MENUITEM "Mount",                       ID_OPEN_HD2
         MENUITEM "Unmount",                     ID_CLOSE_HD2
+        MENUITEM "Mount Blank 20MB Disk",       ID_OPEN_BLANK_20MB_HD2
         MENUITEM SEPARATOR
         MENUITEM "Recent",                      ID_RECENT_HD2
     END
@@ -190,6 +221,7 @@ BEGIN
     BEGIN
         MENUITEM "Mount",                       ID_OPEN_HD3
         MENUITEM "Unmount",                     ID_CLOSE_HD3
+        MENUITEM "Mount Blank 20MB Disk",       ID_OPEN_BLANK_20MB_HD3
         MENUITEM SEPARATOR
         MENUITEM "Recent",                      ID_RECENT_HD3
     END
@@ -197,6 +229,7 @@ BEGIN
     BEGIN
         MENUITEM "Mount",                       ID_OPEN_HD4
         MENUITEM "Unmount",                     ID_CLOSE_HD4
+        MENUITEM "Mount Blank 20MB Disk",       ID_OPEN_BLANK_20MB_HD4
         MENUITEM SEPARATOR
         MENUITEM "Recent",                      ID_RECENT_HD4
     END
@@ -224,7 +257,8 @@ BEGIN
             MENUITEM SEPARATOR
             MENUITEM "Play FDD Noise",          ID_VM_SOUND_NOISE_FDD
             MENUITEM "Play CMT Noise",          ID_VM_SOUND_NOISE_CMT
-            MENUITEM "Play CMT Sound",          ID_VM_SOUND_PLAY_TAPE
+            MENUITEM "Play CMT Signal",         ID_VM_SOUND_TAPE_SIGNAL
+            MENUITEM "Play CMT Voice",          ID_VM_SOUND_TAPE_VOICE
         END
         POPUP "Display"
         BEGIN
@@ -238,7 +272,8 @@ BEGIN
             MENUITEM "Write Printer to File",   ID_VM_PRINTER_TYPE0
             MENUITEM "MZ-1P17",                 ID_VM_PRINTER_TYPE1
             MENUITEM "PC-PR201",                ID_VM_PRINTER_TYPE2, GRAYED
-            MENUITEM "None",                    ID_VM_PRINTER_TYPE3
+            MENUITEM "JAST SOUND",              ID_VM_PRINTER_TYPE3
+            MENUITEM "None",                    ID_VM_PRINTER_TYPE4
         END
     END
     POPUP "Host"
@@ -281,7 +316,7 @@ BEGIN
             MENUITEM "11025Hz",                 ID_SOUND_FREQ3
             MENUITEM "22050Hz",                 ID_SOUND_FREQ4
             MENUITEM "44100Hz",                 ID_SOUND_FREQ5
-            MENUITEM "48000Hz",                 ID_SOUND_FREQ6
+            MENUITEM "62500Hz",                 ID_SOUND_FREQ6
             MENUITEM "96000Hz",                 ID_SOUND_FREQ7
             MENUITEM SEPARATOR
             MENUITEM "50msec",                  ID_SOUND_LATE0
@@ -304,6 +339,7 @@ BEGIN
             MENUITEM "Joystick To Keyboard",    ID_INPUT_JOYTOKEY
         END
         MENUITEM SEPARATOR
+        MENUITEM "Use Direct2D1",               ID_HOST_USE_D2D1
         MENUITEM "Use Direct3D9",               ID_HOST_USE_D3D9
         MENUITEM "Wait Vsync",                  ID_HOST_WAIT_VSYNC
         MENUITEM "Use DirectInput",             ID_HOST_USE_DINPUT
@@ -320,6 +356,7 @@ END
 
 IDI_BITMAP_ACCESS_OFF   BITMAP  DISCARDABLE     "indicator/access_off.bmp"
 IDI_BITMAP_ACCESS_ON    BITMAP  DISCARDABLE     "indicator/access_on.bmp"
+IDI_BITMAP_ACCESS_ON2   BITMAP  DISCARDABLE     "indicator/access_green.bmp"
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -339,7 +376,7 @@ IDI_ICON1               ICON    DISCARDABLE     "x1twin.ico"
 // Dialog
 //
 
-IDD_VOLUME DIALOG DISCARDABLE  0, 0, 250, 240
+IDD_VOLUME DIALOG DISCARDABLE  0, 0, 250, 270
 STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Volume"
 FONT 9, "MS PGothic"
@@ -365,8 +402,11 @@ BEGIN
     LTEXT           "Sound Device #7",IDC_VOLUME_CAPTION6,6,186,60,8
     CONTROL         "",IDC_VOLUME_PARAM_L6,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,70,186,175,12
     CONTROL         "",IDC_VOLUME_PARAM_R6,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,70,201,175,12
-    DEFPUSHBUTTON   "OK",IDOK,70,220,50,14
-    DEFPUSHBUTTON   "Reset",IDC_VOLUME_RESET,130,220,50,14
+    LTEXT           "Sound Device #8",IDC_VOLUME_CAPTION7,6,216,60,8
+    CONTROL         "",IDC_VOLUME_PARAM_L7,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,70,216,175,12
+    CONTROL         "",IDC_VOLUME_PARAM_R7,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,70,231,175,12
+    DEFPUSHBUTTON   "OK",IDOK,70,250,50,14
+    DEFPUSHBUTTON   "Reset",IDC_VOLUME_RESET,130,250,50,14
 END
 
 IDD_JOYSTICK DIALOG DISCARDABLE  0, 0, 175, 210

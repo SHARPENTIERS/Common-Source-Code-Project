@@ -71,8 +71,14 @@ void initialize_config()
 	#if defined(USE_MONITOR_TYPE) && defined(MONITOR_TYPE_DEFAULT)
 		config.monitor_type = MONITOR_TYPE_DEFAULT;
 	#endif
+	#if defined(USE_SCANLINE)
+		config.scan_line_auto = true;
+	#endif
 	#if defined(USE_PRINTER_TYPE) && defined(PRINTER_TYPE_DEFAULT)
 		config.printer_type = PRINTER_TYPE_DEFAULT;
+	#endif
+	#if defined(USE_SERIAL_TYPE) && defined(SERIAL_TYPE_DEFAULT)
+		config.serial_type = SERIAL_TYPE_DEFAULT;
 	#endif
 	#if defined(USE_FLOPPY_DISK)
 		for(int drv = 0; drv < USE_FLOPPY_DISK; drv++) {
@@ -93,7 +99,7 @@ void initialize_config()
 			config.baud_high[drv] = true;
 		}
 	#endif
-	config.compress_state = true;
+	config.compress_state = config.drive_vm_in_opecode = true;
 	
 	// screen
 	#ifndef ONE_BOARD_MICRO_COMPUTER
@@ -111,9 +117,13 @@ void initialize_config()
 	#ifdef USE_FLOPPY_DISK
 		config.sound_noise_fdd = true;
 	#endif
+	#ifdef USE_QUICK_DISK
+		config.sound_noise_qd = true;
+	#endif
 	#ifdef USE_TAPE
 		config.sound_noise_cmt = true;
-		config.sound_play_tape = true;
+		config.sound_tape_signal = true;
+		config.sound_tape_voice = true;
 	#endif
 	
 	// input
@@ -133,6 +143,7 @@ void initialize_config()
 	// win32
 	#ifdef _WIN32
 		#ifndef ONE_BOARD_MICRO_COMPUTER
+//			config.use_d2d1 = true;
 			config.use_d3d9 = true;
 		#endif
 		config.use_dinput = true;
@@ -186,9 +197,13 @@ void load_config(const _TCHAR* config_path)
 	#endif
 	#ifdef USE_SCANLINE
 		config.scan_line = MyGetPrivateProfileBool(_T("Control"), _T("ScanLine"), config.scan_line, config_path);
+		config.scan_line_auto = MyGetPrivateProfileBool(_T("Control"), _T("ScanLineAuto"), config.scan_line_auto, config_path);
 	#endif
-	#ifdef USE_PRINTER
+	#ifdef USE_PRINTER_TYPE
 		config.printer_type = MyGetPrivateProfileInt(_T("Control"), _T("PrinterType"), config.printer_type, config_path);
+	#endif
+	#ifdef USE_SERIAL_TYPE
+		config.serial_type = MyGetPrivateProfileInt(_T("Control"), _T("SerialType"), config.serial_type, config_path);
 	#endif
 	#ifdef USE_FLOPPY_DISK
 		for(int drv = 0; drv < USE_FLOPPY_DISK; drv++) {
@@ -204,6 +219,7 @@ void load_config(const _TCHAR* config_path)
 		}
 	#endif
 	config.compress_state = MyGetPrivateProfileBool(_T("Control"), _T("CompressState"), config.compress_state, config_path);
+	config.drive_vm_in_opecode = MyGetPrivateProfileBool(_T("Control"), _T("DriveVMInOpecode"), config.drive_vm_in_opecode, config_path);
 	
 	// recent files
 	#ifdef USE_CART
@@ -300,11 +316,15 @@ void load_config(const _TCHAR* config_path)
 	config.sound_latency = MyGetPrivateProfileInt(_T("Sound"), _T("Latency"), config.sound_latency, config_path);
 	config.sound_strict_rendering = MyGetPrivateProfileBool(_T("Sound"), _T("StrictRendering"), config.sound_strict_rendering, config_path);
 	#ifdef USE_FLOPPY_DISK
-		config.sound_noise_fdd = MyGetPrivateProfileBool(_T("Sound"), _T("NoiseFDD"), config.sound_noise_fdd, config_path);;
+		config.sound_noise_fdd = MyGetPrivateProfileBool(_T("Sound"), _T("NoiseFDD"), config.sound_noise_fdd, config_path);
+	#endif
+	#ifdef USE_QUICK_DISK
+		config.sound_noise_qd = MyGetPrivateProfileBool(_T("Sound"), _T("NoiseQD"), config.sound_noise_qd, config_path);
 	#endif
 	#ifdef USE_TAPE
-		config.sound_noise_cmt = MyGetPrivateProfileBool(_T("Sound"), _T("NoiseCMT"), config.sound_noise_cmt, config_path);;
-		config.sound_play_tape = MyGetPrivateProfileBool(_T("Sound"), _T("PlayTape"), config.sound_play_tape, config_path);
+		config.sound_noise_cmt = MyGetPrivateProfileBool(_T("Sound"), _T("NoiseCMT"), config.sound_noise_cmt, config_path);
+		config.sound_tape_signal = MyGetPrivateProfileBool(_T("Sound"), _T("TapeSignal"), config.sound_tape_signal, config_path);
+		config.sound_tape_voice = MyGetPrivateProfileBool(_T("Sound"), _T("TapeVoice"), config.sound_tape_voice, config_path);
 	#endif
 	#ifdef USE_SOUND_VOLUME
 		for(int i = 0; i < USE_SOUND_VOLUME; i++) {
@@ -358,7 +378,9 @@ void load_config(const _TCHAR* config_path)
 	
 	// win32
 	#ifdef _WIN32
+		config.use_telnet = MyGetPrivateProfileBool(_T("Win32"), _T("UseTelnet"), config.use_telnet, config_path);
 		#ifndef ONE_BOARD_MICRO_COMPUTER
+			config.use_d2d1 = MyGetPrivateProfileBool(_T("Win32"), _T("UseDirect2D1"), config.use_d2d1, config_path);
 			config.use_d3d9 = MyGetPrivateProfileBool(_T("Win32"), _T("UseDirect3D9"), config.use_d3d9, config_path);
 			config.wait_vsync = MyGetPrivateProfileBool(_T("Win32"), _T("WaitVSync"), config.wait_vsync, config_path);
 		#endif
@@ -370,8 +392,8 @@ void load_config(const _TCHAR* config_path)
 	// qt
 	#ifdef _USE_QT
 		config.use_opengl_scanline = MyGetPrivateProfileBool(_T("Qt"), _T("UseOpenGLScanLine"), config.use_opengl_scanline, config_path);
-		config.opengl_scanline_vert = MyGetPrivateProfileBool(_T("Qt"), _T("OpenGLScanLineVert"), config.opengl_scanline_vert, config_path);;
-		config.opengl_scanline_horiz = MyGetPrivateProfileBool(_T("Qt"), _T("OpenGLScanLineHoriz"), config.opengl_scanline_horiz, config_path);;
+		config.opengl_scanline_vert = MyGetPrivateProfileBool(_T("Qt"), _T("OpenGLScanLineVert"), config.opengl_scanline_vert, config_path);
+		config.opengl_scanline_horiz = MyGetPrivateProfileBool(_T("Qt"), _T("OpenGLScanLineHoriz"), config.opengl_scanline_horiz, config_path);
 		config.use_opengl_filters = MyGetPrivateProfileBool(_T("Qt"), _T("UseOpenGLFilters"), config.use_opengl_filters, config_path);
 		config.opengl_filter_num = MyGetPrivateProfileInt(_T("Qt"), _T("OpenGLFilterNum"), config.opengl_filter_num, config_path);
 		config.swap_kanji_pause = MyGetPrivateProfileBool(_T("Qt"), _T("SwapKanjiPause"), config.swap_kanji_pause, config_path);
@@ -419,9 +441,13 @@ void save_config(const _TCHAR* config_path)
 	#endif
 	#ifdef USE_SCANLINE
 		MyWritePrivateProfileBool(_T("Control"), _T("ScanLine"), config.scan_line, config_path);
+		MyWritePrivateProfileBool(_T("Control"), _T("ScanLineAuto"), config.scan_line_auto, config_path);
 	#endif
-	#ifdef USE_PRINTER
+	#ifdef USE_PRINTER_TYPE
 		MyWritePrivateProfileInt(_T("Control"), _T("PrinterType"), config.printer_type, config_path);
+	#endif
+	#ifdef USE_SERIAL_TYPE
+		MyWritePrivateProfileInt(_T("Control"), _T("SerialType"), config.serial_type, config_path);
 	#endif
 	#ifdef USE_FLOPPY_DISK
 		for(int drv = 0; drv < USE_FLOPPY_DISK; drv++) {
@@ -437,6 +463,7 @@ void save_config(const _TCHAR* config_path)
 		}
 	#endif
 	MyWritePrivateProfileBool(_T("Control"), _T("CompressState"), config.compress_state, config_path);
+	MyWritePrivateProfileBool(_T("Control"), _T("DriveVMInOpecode"), config.drive_vm_in_opecode, config_path);
 	
 	// recent files
 	#ifdef USE_CART
@@ -535,9 +562,13 @@ void save_config(const _TCHAR* config_path)
 	#ifdef USE_FLOPPY_DISK
 		MyWritePrivateProfileBool(_T("Sound"), _T("NoiseFDD"), config.sound_noise_fdd, config_path);
 	#endif
+	#ifdef USE_QUICK_DISK
+		MyWritePrivateProfileBool(_T("Sound"), _T("NoiseQD"), config.sound_noise_qd, config_path);
+	#endif
 	#ifdef USE_TAPE
 		MyWritePrivateProfileBool(_T("Sound"), _T("NoiseCMT"), config.sound_noise_cmt, config_path);
-		MyWritePrivateProfileBool(_T("Sound"), _T("PlayTape"), config.sound_play_tape, config_path);
+		MyWritePrivateProfileBool(_T("Sound"), _T("TapeSignal"), config.sound_tape_signal, config_path);
+		MyWritePrivateProfileBool(_T("Sound"), _T("TapeVoice"), config.sound_tape_voice, config_path);
 	#endif
 	#ifdef USE_SOUND_VOLUME
 		for(int i = 0; i < USE_SOUND_VOLUME; i++) {
@@ -567,7 +598,9 @@ void save_config(const _TCHAR* config_path)
 	
 	// win32
 	#ifdef _WIN32
+		MyWritePrivateProfileBool(_T("Win32"), _T("UseTelnet"), config.use_telnet, config_path);
 		#ifndef ONE_BOARD_MICRO_COMPUTER
+			MyWritePrivateProfileBool(_T("Win32"), _T("UseDirect2D1"), config.use_d2d1, config_path);
 			MyWritePrivateProfileBool(_T("Win32"), _T("UseDirect3D9"), config.use_d3d9, config_path);
 			MyWritePrivateProfileBool(_T("Win32"), _T("WaitVSync"), config.wait_vsync, config_path);
 		#endif
@@ -579,8 +612,8 @@ void save_config(const _TCHAR* config_path)
 	// qt
 	#ifdef _USE_QT
 		MyWritePrivateProfileBool(_T("Qt"), _T("UseOpenGLScanLine"), config.use_opengl_scanline, config_path);
-		MyWritePrivateProfileBool(_T("Qt"), _T("OpenGLScanLineVert"), config.opengl_scanline_vert, config_path);;
-		MyWritePrivateProfileBool(_T("Qt"), _T("OpenGLScanLineHoriz"), config.opengl_scanline_horiz, config_path);;
+		MyWritePrivateProfileBool(_T("Qt"), _T("OpenGLScanLineVert"), config.opengl_scanline_vert, config_path);
+		MyWritePrivateProfileBool(_T("Qt"), _T("OpenGLScanLineHoriz"), config.opengl_scanline_horiz, config_path);
 		MyWritePrivateProfileBool(_T("Qt"), _T("UseOpenGLFilters"), config.use_opengl_filters, config_path);
 		MyWritePrivateProfileInt(_T("Qt"), _T("OpenGLFilterNum"), config.opengl_filter_num, config_path);
 		MyWritePrivateProfileBool(_T("Qt"), _T("SwapKanjiPause"), config.swap_kanji_pause, config_path);
@@ -591,7 +624,7 @@ void save_config(const _TCHAR* config_path)
 	#endif
 }
 
-#define STATE_VERSION	6
+#define STATE_VERSION	7
 
 bool process_config_state(void *f, bool loading)
 {
@@ -632,6 +665,9 @@ bool process_config_state(void *f, bool loading)
 	#endif
 	#ifdef USE_PRINTER_TYPE
 		state_fio->StateValue(config.printer_type);
+	#endif
+	#ifdef USE_SERIAL_TYPE
+		state_fio->StateValue(config.serial_type);
 	#endif
 	#ifdef USE_FLOPPY_DISK
 		for(int drv = 0; drv < USE_FLOPPY_DISK; drv++) {

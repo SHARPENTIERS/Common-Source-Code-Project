@@ -415,7 +415,7 @@ struct i386_state
 	DEVICE *pic;
 	DEVICE *program;
 	DEVICE *io;
-#ifdef I386_PSEUDO_BIOS
+#ifdef I86_PSEUDO_BIOS
 	DEVICE *bios;
 #endif
 #ifdef SINGLE_MODE_DMA

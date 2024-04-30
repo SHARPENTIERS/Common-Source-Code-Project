@@ -1042,11 +1042,11 @@ const _TCHAR *DLL_PREFIX get_initial_current_path()
 	
 	if(!initialized) {
 #if defined(_WIN32) && !defined(_USE_QT)
-		GetCurrentDirectoryA(_MAX_PATH, current_path);
+		GetCurrentDirectory(_MAX_PATH, current_path);
 #else
 		getcwd(current_path, _MAX_PATH);
 #endif
-		int len = strlen(current_path);
+		size_t len = _tcslen(current_path);
 		if(current_path[len - 1] != '\\' && current_path[len - 1] != '/') {
 #if defined(_WIN32) || defined(Q_OS_WIN)
 			current_path[len] = '\\';
@@ -1085,6 +1085,42 @@ void DLL_PREFIX create_local_path(_TCHAR *file_path, int length, const _TCHAR *f
 	my_vstprintf_s(file_name, _MAX_PATH, format, ap);
 	va_end(ap);
 	my_stprintf_s(file_path, length, _T("%s%s"), get_application_path(), file_name);
+}
+
+const _TCHAR *DLL_PREFIX create_absolute_path(const _TCHAR *format, ...)
+{
+	static _TCHAR file_path[8][_MAX_PATH];
+	static unsigned int table_index = 0;
+	unsigned int output_index = (table_index++) & 7;
+	_TCHAR file_name[_MAX_PATH];
+	va_list ap;
+	
+	va_start(ap, format);
+	my_vstprintf_s(file_name, _MAX_PATH, format, ap);
+	va_end(ap);
+	
+	if(is_absolute_path(file_name)) {
+		my_tcscpy_s(file_path[output_index], _MAX_PATH, file_name);
+	} else {
+		my_stprintf_s(file_path[output_index], _MAX_PATH, _T("%s%s"), get_initial_current_path(), file_name);
+	}
+	return (const _TCHAR *)file_path[output_index];
+}
+
+void DLL_PREFIX create_absolute_path(_TCHAR *file_path, int length, const _TCHAR *format, ...)
+{
+	_TCHAR file_name[_MAX_PATH];
+	va_list ap;
+	
+	va_start(ap, format);
+	my_vstprintf_s(file_name, _MAX_PATH, format, ap);
+	va_end(ap);
+	
+	if(is_absolute_path(file_name)) {
+		my_tcscpy_s(file_path, length, file_name);
+	} else {
+		my_stprintf_s(file_path, length, _T("%s%s"), get_initial_current_path(), file_name);
+	}
 }
 
 bool DLL_PREFIX is_absolute_path(const _TCHAR *file_path)
@@ -1140,8 +1176,8 @@ bool DLL_PREFIX check_file_extension(const _TCHAR *file_path, const _TCHAR *ext)
 	if((pos != (int)std::string::npos) && (pos >= ((int)s_fpath.length() - (int)s_ext.length()))) return true; 
 	return false;
 #else
-	int nam_len = _tcslen(file_path);
-	int ext_len = _tcslen(ext);
+	size_t nam_len = _tcslen(file_path);
+	size_t ext_len = _tcslen(ext);
 	
 	return (nam_len >= ext_len && _tcsncicmp(&file_path[nam_len - ext_len], ext, ext_len) == 0);
 #endif

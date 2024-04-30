@@ -62,6 +62,7 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	pio2 = new I8255(this, emu);
 	pio2->set_device_name(_T("8255 PIO (Sound/Data Recorder)"));
 	io = new IO(this, emu);
+	io->space = 0x100;
 	flipflop = new LS393(this, emu); // LS74
 	not_remote = new NOT(this, emu);
 	pcm = new PCM1BIT(this, emu);
@@ -447,8 +448,8 @@ bool VM::process_state(FILEIO* state_fio, bool loading)
 		return false;
 	}
 	for(DEVICE* device = first_device; device; device = device->next_device) {
-		const char *name = typeid(*device).name() + 6; // skip "class "
-		int len = strlen(name);
+		const _TCHAR *name = char_to_tchar(typeid(*device).name() + 6); // skip "class "
+		int len = (int)_tcslen(name);
 		
 		if(!state_fio->StateCheckInt32(len)) {
 			return false;

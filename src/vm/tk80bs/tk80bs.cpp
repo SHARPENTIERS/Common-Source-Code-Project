@@ -63,6 +63,7 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	pio_b = new I8255(this, emu);
 	pio_b->set_device_name(_T("8255 PIO (TK-80BS)"));
 	memio = new IO(this, emu);
+	memio->space = 0x10000;
 	memio->set_device_name(_T("Memory Mapped I/O (TK-80BS)"));
 #endif
 	drec = new DATAREC(this, emu);
@@ -82,6 +83,8 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	display = new DISPLAY(this, emu);
 	keyboard = new KEYBOARD(this, emu);
 	memory = new MEMBUS(this, emu);
+	memory->space = 0x10000;
+	memory->bank_size = 0x200;
 	
 	// set contexts
 	event->set_context_cpu(cpu);
@@ -550,8 +553,8 @@ bool VM::process_state(FILEIO* state_fio, bool loading)
 		return false;
 	}
 	for(DEVICE* device = first_device; device; device = device->next_device) {
-		const char *name = typeid(*device).name() + 6; // skip "class "
-		int len = strlen(name);
+		const _TCHAR *name = char_to_tchar(typeid(*device).name() + 6); // skip "class "
+		int len = (int)_tcslen(name);
 		
 		if(!state_fio->StateCheckInt32(len)) {
 			return false;

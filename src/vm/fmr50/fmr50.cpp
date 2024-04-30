@@ -22,9 +22,11 @@
 #include "../i8253.h"
 #include "../i8259.h"
 #if defined(HAS_I286)
+//#include "../i286_np21.h"
 #include "../i286.h"
 #else
-#include "../i386.h"
+#include "../i386_np21.h"
+//#include "../i386.h"
 #endif
 #include "../io.h"
 #include "../mb8877.h"
@@ -111,8 +113,17 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	
 #if defined(HAS_I286)
 	cpu = new I286(this, emu);
-#else
+//	cpu->device_model = INTEL_80286;
+#elif defined(HAS_I386)
 	cpu = new I386(this, emu);
+	cpu->device_model = INTEL_80386;
+#elif defined(HAS_I486)
+	cpu = new I386(this, emu);
+#if defined(HAS_I486DX)
+	cpu->device_model = INTEL_I486DX;
+#else
+	cpu->device_model = INTEL_I486SX;
+#endif
 #endif
 	crtc = new HD46505(this, emu);
 #ifdef _FMR60
@@ -124,7 +135,10 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	pit1 = new I8253(this, emu);
 	pit1->set_device_name(_T("8253 PIT #1"));
 	pic = new I8259(this, emu);
+	pic->num_chips = 2;
 	io = new IO(this, emu);
+	io->space = 0x10000;
+	io->bus_width = 16;
 	fdc = new MB8877(this, emu);
 	fdc->set_context_noise_seek(new NOISE(this, emu));
 	fdc->set_context_noise_head_down(new NOISE(this, emu));
@@ -206,6 +220,7 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	rtc->set_context_busy(timer, SIG_TIMER_RTC, 0x80);
 	scsi_host->set_context_irq(scsi, SIG_SCSI_IRQ, 1);
 	scsi_host->set_context_drq(scsi, SIG_SCSI_DRQ, 1);
+	dma->set_context_cpu(cpu);
 	dma->set_context_memory(memory);
 	dma->set_context_ch0(fdc);
 	dma->set_context_ch1(scsi_host);
@@ -534,8 +549,8 @@ bool VM::process_state(FILEIO* state_fio, bool loading)
 		return false;
 	}
 	for(DEVICE* device = first_device; device; device = device->next_device) {
-		const char *name = typeid(*device).name() + 6; // skip "class "
-		int len = strlen(name);
+		const _TCHAR *name = char_to_tchar(typeid(*device).name() + 6); // skip "class "
+		int len = (int)_tcslen(name);
 		
 		if(!state_fio->StateCheckInt32(len)) {
 			return false;

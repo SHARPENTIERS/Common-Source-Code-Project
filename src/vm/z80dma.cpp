@@ -14,8 +14,6 @@
 #include "debugger.h"
 #endif
 
-//#define DMA_DEBUG
-
 #define CMD_RESET				0xc3
 #define CMD_RESET_PORT_A_TIMING			0xc7
 #define CMD_RESET_PORT_B_TIMING			0xcb
@@ -45,7 +43,7 @@
 #define INT_MATCH		1
 #define INT_END_OF_BLOCK	2
 
-#define GET_REGNUM(r)		(&(r) - &(WR0))
+#define GET_REGNUM(r)		(int)(&(r) - &(WR0))
 
 #define WR0			regs.m[0][0]
 #define WR1			regs.m[1][0]
@@ -152,7 +150,7 @@ void Z80DMA::write_io8(uint32_t addr, uint32_t data)
 {
 	if(wr_num == 0) {
 		if((data & 0x87) == 0) {
-#ifdef DMA_DEBUG
+#ifdef _DMA_DEBUG_LOG
 			this->out_debug_log(_T("Z80DMA: WR2=%2x\n"), data);
 #endif
 			WR2 = data;
@@ -160,7 +158,7 @@ void Z80DMA::write_io8(uint32_t addr, uint32_t data)
 				wr_tmp[wr_num++] = GET_REGNUM(PORTB_TIMING);
 			}
 		} else if((data & 0x87) == 4) {
-#ifdef DMA_DEBUG
+#ifdef _DMA_DEBUG_LOG
 			this->out_debug_log(_T("Z80DMA: WR1=%2x\n"), data);
 #endif
 			WR1 = data;
@@ -168,7 +166,7 @@ void Z80DMA::write_io8(uint32_t addr, uint32_t data)
 				wr_tmp[wr_num++] = GET_REGNUM(PORTA_TIMING);
 			}
 		} else if((data & 0x80) == 0) {
-#ifdef DMA_DEBUG
+#ifdef _DMA_DEBUG_LOG
 			this->out_debug_log(_T("Z80DMA: WR0=%2x\n"), data);
 #endif
 			WR0 = data;
@@ -185,7 +183,7 @@ void Z80DMA::write_io8(uint32_t addr, uint32_t data)
 				wr_tmp[wr_num++] = GET_REGNUM(BLOCKLEN_H);
 			}
 		} else if((data & 0x83) == 0x80) {
-#ifdef DMA_DEBUG
+#ifdef _DMA_DEBUG_LOG
 			this->out_debug_log(_T("Z80DMA: WR3=%2x\n"), data);
 #endif
 			WR3 = data;
@@ -196,8 +194,13 @@ void Z80DMA::write_io8(uint32_t addr, uint32_t data)
 				wr_tmp[wr_num++] = GET_REGNUM(MATCH_BYTE);
 			}
 			enabled = ((data & 0x40) != 0);
+			// RDY signal sense is a LEVEL, not an EDDGE (thanks Mr.Sato)
+			if(now_ready() && INT_ON_READY) {
+				request_intr(INT_RDY);
+				update_intr();
+			}
 		} else if((data & 0x83) == 0x81) {
-#ifdef DMA_DEBUG
+#ifdef _DMA_DEBUG_LOG
 			this->out_debug_log(_T("Z80DMA: WR4=%2x\n"), data);
 #endif
 			WR4 = data;
@@ -211,12 +214,16 @@ void Z80DMA::write_io8(uint32_t addr, uint32_t data)
 				wr_tmp[wr_num++] = GET_REGNUM(INTERRUPT_CTRL);
 			}
 		} else if((data & 0xc7) == 0x82) {
-#ifdef DMA_DEBUG
+#ifdef _DMA_DEBUG_LOG
 			this->out_debug_log(_T("Z80DMA: WR5=%2x\n"), data);
 #endif
 			WR5 = data;
+			// RDY signal sense is a LEVEL, not an EDDGE (thanks Mr.Sato)
+			if(now_ready() && INT_ON_READY) {
+				request_intr(INT_RDY);
+			}
 		} else if((data & 0x83) == 0x83) {
-#ifdef DMA_DEBUG
+#ifdef _DMA_DEBUG_LOG
 			this->out_debug_log(_T("Z80DMA: WR6=%2x\n"), data);
 #endif
 			WR6 = data;
@@ -239,6 +246,7 @@ void Z80DMA::write_io8(uint32_t addr, uint32_t data)
 			// run command
 			switch (data) {
 			case CMD_ENABLE_AFTER_RETI:
+				enalbe_after_reti = true;
 				break;
 			case CMD_READ_STATUS_BYTE:
 				// force to read status (from Xmillenium)
@@ -257,6 +265,7 @@ void Z80DMA::write_io8(uint32_t addr, uint32_t data)
 			case CMD_RESET:
 				enabled = false;
 				force_ready = false;
+				enalbe_after_reti = false;
 				req_intr = in_service = false;
 				update_intr();
 				status = 0x30;
@@ -304,12 +313,20 @@ void Z80DMA::write_io8(uint32_t addr, uint32_t data)
 				break;
 			case CMD_FORCE_READY:
 				force_ready = true;
+				// RDY signal sense is a LEVEL, not an EDDGE (thanks Mr.Sato)
+				if(now_ready() && INT_ON_READY) {
+					request_intr(INT_RDY);
+				}
 #ifndef SINGLE_MODE_DMA
 				do_dma();
 #endif
 				break;
 			case CMD_ENABLE_INTERRUPTS:
 				WR3 |= 0x20;
+				// RDY signal sense is a LEVEL, not an EDDGE (thanks Mr.Sato)
+				if(now_ready() && INT_ON_READY) {
+					request_intr(INT_RDY);
+				}
 				break;
 			case CMD_DISABLE_INTERRUPTS:
 				WR3 &= ~0x20;
@@ -324,7 +341,7 @@ void Z80DMA::write_io8(uint32_t addr, uint32_t data)
 		wr_ptr = 0;
 	} else {
 		int nreg = wr_tmp[wr_ptr];
-#ifdef DMA_DEBUG
+#ifdef _DMA_DEBUG_LOG
 		this->out_debug_log(_T("Z80DMA: WR[%d,%d]=%2x\n"), nreg >> 3, nreg & 7, data);
 #endif
 		regs.t[nreg] = data;
@@ -341,9 +358,15 @@ void Z80DMA::write_io8(uint32_t addr, uint32_t data)
 				wr_tmp[wr_num++] = GET_REGNUM(INTERRUPT_VECTOR);
 			}
 			wr_ptr = 0;
+			// RDY signal sense is a LEVEL, not an EDDGE (thanks Mr.Sato)
+			if(now_ready() && INT_ON_READY) {
+				request_intr(INT_RDY);
+			}
 		} else if(wr_tmp[wr_num] == GET_REGNUM(READ_MASK)) {
 			// from Xmillenium
+			upcount--;
 			update_read_buffer();
+			upcount++;
 		}
 	}
 }
@@ -356,7 +379,7 @@ uint32_t Z80DMA::read_io8(uint32_t addr)
 	}
 	uint32_t data = rr_tmp[rr_ptr];
 	
-#ifdef DMA_DEBUG
+#ifdef _DMA_DEBUG_LOG
 	this->out_debug_log(_T("Z80DMA: RR[%d]=%2x\n"), rr_ptr, data);
 #endif
 	if(++rr_ptr >= rr_num) {
@@ -489,7 +512,7 @@ uint32_t Z80DMA::read_ioport(uint32_t addr, int* wait)
 
 void Z80DMA::do_dma()
 {
-	if(!enabled) {
+	if(!enabled || (enalbe_after_reti && in_service)) {
 		return;
 	}
 	bool occured = false;
@@ -513,7 +536,7 @@ void Z80DMA::do_dma()
 #ifndef SINGLE_MODE_DMA
 restart:
 #endif
-	while(enabled && now_ready() && !(upcount == blocklen || found)) {
+	while(enabled && now_ready() && !(upcount >= blocklen || found)) {
 		if(dma_stop) {
 			if(upcount < blocklen) {
 				upcount++;
@@ -532,12 +555,12 @@ restart:
 		if(PORTA_IS_SOURCE) {
 			if(PORTA_MEMORY) {
 				data = read_memory(addr_a, &wait_r);
-#ifdef DMA_DEBUG
+#ifdef _DMA_DEBUG_LOG
 				this->out_debug_log(_T("Z80DMA: RAM[%4x]=%2x -> "), addr_a, data);
 #endif
 			} else {
 				data = read_ioport(addr_a, &wait_r);
-#ifdef DMA_DEBUG
+#ifdef _DMA_DEBUG_LOG
 				this->out_debug_log(_T("Z80DMA: INP(%4x)=%2x -> "), addr_a, data);
 #endif
 			}
@@ -551,12 +574,12 @@ restart:
 		} else {
 			if(PORTB_MEMORY) {
 				data = read_memory(addr_b, &wait_r);
-#ifdef DMA_DEBUG
+#ifdef _DMA_DEBUG_LOG
 				this->out_debug_log(_T("Z80DMA: RAM[%4x]=%2x -> "), addr_b, data);
 #endif
 			} else {
 				data = read_ioport(addr_b, &wait_r);
-#ifdef DMA_DEBUG
+#ifdef _DMA_DEBUG_LOG
 				this->out_debug_log(_T("Z80DMA: INP(%4x)=%2x -> "), addr_b, data);
 #endif
 			}
@@ -573,12 +596,12 @@ restart:
 		if(TRANSFER_MODE == TM_TRANSFER || TRANSFER_MODE == TM_SEARCH_TRANSFER) {
 			if(PORTA_IS_SOURCE) {
 				if(PORTB_MEMORY) {
-#ifdef DMA_DEBUG
+#ifdef _DMA_DEBUG_LOG
 					this->out_debug_log(_T("RAM[%4x]\n"), addr_b);
 #endif
 					write_memory(addr_b, data, &wait_w);
 				} else {
-#ifdef DMA_DEBUG
+#ifdef _DMA_DEBUG_LOG
 					this->out_debug_log(_T("OUT(%4x)\n"), addr_b);
 #endif
 					write_ioport(addr_b, data, &wait_w);
@@ -592,12 +615,12 @@ restart:
 				}
 			} else {
 				if(PORTA_MEMORY) {
-#ifdef DMA_DEBUG
+#ifdef _DMA_DEBUG_LOG
 					this->out_debug_log(_T("RAM[%4x]\n"), addr_a);
 #endif
 					write_memory(addr_a, data, &wait_w);
 				} else {
-#ifdef DMA_DEBUG
+#ifdef _DMA_DEBUG_LOG
 					this->out_debug_log(_T("OUT(%4x)\n"), addr_a);
 #endif
 					write_ioport(addr_a, data, &wait_w);
@@ -653,7 +676,7 @@ inc_ports:
 #endif
 	}
 	
-#ifdef DMA_DEBUG
+#ifdef _DMA_DEBUG_LOG
 	if(occured) {
 		this->out_debug_log(_T("Z80DMA: COUNT=%d BLOCKLEN=%d FOUND=%d\n"), upcount, blocklen, found ? 1 : 0);
 	}
@@ -661,7 +684,7 @@ inc_ports:
 	if(occured && (upcount == blocklen || found)) {
 		// auto restart
 		if(AUTO_RESTART && upcount == blocklen && !force_ready) {
-#ifdef DMA_DEBUG
+#ifdef _DMA_DEBUG_LOG
 			this->out_debug_log(_T("Z80DMA: AUTO RESTART !!!\n"));
 #endif
 			upcount = 0;
@@ -716,7 +739,7 @@ void Z80DMA::request_bus()
 #ifdef SINGLE_MODE_DMA
 			d_cpu->write_signal(SIG_CPU_BUSREQ, 1, 1);
 #endif
-			d_cpu->set_extra_clock(2);
+			d_cpu->set_extra_clock(3);
 		}
 		bus_master = true;
 	}
@@ -815,12 +838,14 @@ void Z80DMA::notify_intr_reti()
 	// detect RETI
 	if(in_service) {
 		in_service = false;
+		enalbe_after_reti = false;
 		update_intr();
 		return;
 	}
 	if(d_child != NULL) {
 		d_child->notify_intr_reti();
 	}
+	update_intr();
 }
 
 #ifdef USE_DEBUGGER
@@ -841,7 +866,7 @@ PORT-A(MEM,FFFF)->PORT-B(I/O,FFFF) CNT=65536 BLK=65536 STAT=00 ENABLE=1 READY=1
 }
 #endif
 
-#define STATE_VERSION	2
+#define STATE_VERSION	3
 
 bool Z80DMA::process_state(FILEIO* state_fio, bool loading)
 {
@@ -863,6 +888,7 @@ bool Z80DMA::process_state(FILEIO* state_fio, bool loading)
 	state_fio->StateValue(enabled);
 	state_fio->StateValue(ready);
 	state_fio->StateValue(force_ready);
+	state_fio->StateValue(enalbe_after_reti);
 	state_fio->StateValue(addr_a);
 	state_fio->StateValue(addr_b);
 	state_fio->StateValue(upcount);

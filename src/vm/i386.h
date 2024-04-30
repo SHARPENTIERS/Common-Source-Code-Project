@@ -3,12 +3,12 @@
 
 	Origin : MAME i386 core
 	Author : Takeda.Toshiya
-	Date  : 2009.06.08-
+	Date   : 2009.06.08-
 
 	[ i386/i486/Pentium/MediaGX ]
 */
 
-#ifndef _I386_H_ 
+#ifndef _I386_H_
 #define _I386_H_
 
 #include "vm.h"
@@ -25,7 +25,7 @@ class I386 : public DEVICE
 {
 private:
 	DEVICE *d_mem, *d_io, *d_pic;
-#ifdef I386_PSEUDO_BIOS
+#ifdef I86_PSEUDO_BIOS
 	DEVICE *d_bios;
 #endif
 #ifdef SINGLE_MODE_DMA
@@ -39,7 +39,7 @@ private:
 public:
 	I386(VM_TEMPLATE* parent_vm, EMU* parent_emu) : DEVICE(parent_vm, parent_emu)
 	{
-#ifdef I386_PSEUDO_BIOS
+#ifdef I86_PSEUDO_BIOS
 		d_bios = NULL;
 #endif
 #ifdef SINGLE_MODE_DMA
@@ -131,7 +131,7 @@ public:
 	{
 		d_pic = device;
 	}
-#ifdef I386_PSEUDO_BIOS
+#ifdef I86_PSEUDO_BIOS
 	void set_context_bios(DEVICE* device)
 	{
 		d_bios = device;

@@ -25,6 +25,7 @@
 #include "../mz1p17.h"
 #include "../noise.h"
 //#include "../pcpr201.h"
+#include "../pcm8bit.h"
 #include "../prnfile.h"
 #include "../scsi_hdd.h"
 #include "../scsi_host.h"
@@ -51,6 +52,7 @@
 #include "mouse.h"
 #include "psub.h"
 #include "sasi.h"
+#include "cz8rb.h"
 
 #include "../mcs48.h"
 #include "../upd1990a.h"
@@ -84,6 +86,7 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	crtc = new HD46505(this, emu);
 	pio = new I8255(this, emu);
 	io = new IO(this, emu);
+	io->space = 0x10000;
 	fdc = new MB8877(this, emu);
 	fdc->set_context_noise_seek(new NOISE(this, emu));
 	fdc->set_context_noise_head_down(new NOISE(this, emu));
@@ -93,7 +96,9 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 		sasi_hdd[i] = new SASI_HDD(this, emu);
 		sasi_hdd[i]->set_device_name(_T("SASI Hard Disk Drive #%d"), i + 1);
 		sasi_hdd[i]->scsi_id = i;
-		sasi_hdd[i]->bytes_per_sec = 32 * 1024; // 32KB/s
+//		sasi_hdd[i]->bytes_per_sec = 32 * 1024; // 32KB/s
+		sasi_hdd[i]->bytes_per_sec = 3600 / 60 * 256 * 33; // 3600rpm, 256bytes x 33sectors in track (thanks Mr.Sato)
+		sasi_hdd[i]->data_req_delay = 0; // thanks Mr.Sato
 		sasi_hdd[i]->set_context_interface(sasi_host);
 		sasi_host->set_context_target(sasi_hdd[i]);
 	}
@@ -131,6 +136,8 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 		printer = new MZ1P17(this, emu);
 //	} else if(config.printer_type == 2) {
 //		printer = new PCPR201(this, emu);
+	} else if(config.printer_type == 3) {
+		printer = new PCM8BIT(this, emu);
 	} else {
 		printer = dummy;
 	}
@@ -149,6 +156,7 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	memory = new MEMORY(this, emu);
 	mouse = new MOUSE(this, emu);
 	sasi = new SASI(this, emu);
+	cz8rb = new CZ8RB(this, emu);
 	
 	if(pseudo_sub_cpu) {
 		psub = new PSUB(this, emu);
@@ -181,6 +189,9 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	}
 	if(sound_type == 2) {
 		event->set_context_sound(opm2);
+	}
+	if(config.printer_type == 3) {
+		event->set_context_sound(printer);
 	}
 	event->set_context_sound(psg);
 	event->set_context_sound(drec);
@@ -370,6 +381,7 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	io->set_iomap_single_rw(0xb00, memory);
 #endif
 	io->set_iomap_range_rw(0xd00, 0xd03, emm);
+	io->set_iomap_range_rw(0xe00, 0xe03, cz8rb);
 	io->set_iomap_range_r(0xe80, 0xe81, display);
 	io->set_iomap_range_w(0xe80, 0xe82, display);
 	io->set_iomap_range_rw(0xfd0, 0xfd3, sasi);
@@ -464,10 +476,14 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 //#ifdef _X1TURBO_FEATURE
 //		if(config.drive_type == 2) {
 //			fdc->set_drive_type(drv, DRIVE_TYPE_2HD);
-//		} else
+//			fdc->set_drive_rpm (drv, 360);
+//		} else {
 ///#ndif
-		fdc->set_drive_type(drv, DRIVE_TYPE_2D);
-//		fdc->set_drive_rpm(drv, 300);
+			fdc->set_drive_type(drv, DRIVE_TYPE_2D);
+			fdc->set_drive_rpm (drv, 300);
+//#ifdef _X1TURBO_FEATURE
+//		}
+//#endif
 //		fdc->set_drive_mfm(drv, true);
 	}
 	for(int drv = 0; drv < USE_HARD_DISK; drv++) {
@@ -604,6 +620,10 @@ void VM::initialize_sound(int rate, int samples)
 	if(sound_type == 2) {
 		opm2->initialize_sound(rate, 4000000, samples, 0);
 	}
+	if(config.printer_type == 3) {
+		PCM8BIT *pcm8 = (PCM8BIT *)printer;
+		pcm8->initialize_sound(rate, 32000);
+	}
 	psg->initialize_sound(rate, 2000000, samples, 0, 0);
 #ifdef _X1TWIN
 	pce->initialize_sound(rate);
@@ -648,17 +668,22 @@ void VM::set_sound_device_volume(int ch, int decibel_l, int decibel_r)
 			opm2->set_volume(0, decibel_l, decibel_r);
 		}
 	} else if(ch == 3) {
-		drec->set_volume(0, decibel_l, decibel_r);
+		if(config.printer_type == 3) {
+			PCM8BIT *pcm8 = (PCM8BIT *)printer;
+			pcm8->set_volume(0, decibel_l, decibel_r);
+		}
 	} else if(ch == 4) {
+		drec->set_volume(0, decibel_l, decibel_r);
+	} else if(ch == 5) {
 		fdc->get_context_noise_seek()->set_volume(0, decibel_l, decibel_r);
 		fdc->get_context_noise_head_down()->set_volume(0, decibel_l, decibel_r);
 		fdc->get_context_noise_head_up()->set_volume(0, decibel_l, decibel_r);
-	} else if(ch == 5) {
+	} else if(ch == 6) {
 		drec->get_context_noise_play()->set_volume(0, decibel_l, decibel_r);
 		drec->get_context_noise_stop()->set_volume(0, decibel_l, decibel_r);
 		drec->get_context_noise_fast()->set_volume(0, decibel_l, decibel_r);
 #if defined(_X1TWIN)
-	} else if(ch == 6) {
+	} else if(ch == 7) {
 		pce->set_volume(0, decibel_l, decibel_r);
 #endif
 	}
@@ -774,7 +799,24 @@ bool VM::is_floppy_disk_protected(int drv)
 
 uint32_t VM::is_floppy_disk_accessed()
 {
-	return fdc->read_signal(0);
+	if(floppy->get_motor_on()) {
+		int drv = fdc->read_signal(SIG_MB8877_DRIVEREG);
+		return 1 << drv;
+	}
+	return 0;
+}
+
+uint32_t VM::floppy_disk_indicator_color()
+{
+#ifdef _X1TURBO_FEATURE
+	if(floppy->get_motor_on()) {
+		int drv = fdc->read_signal(SIG_MB8877_DRIVEREG);
+		if(fdc->get_drive_type(drv) == DRIVE_TYPE_2HD) {
+			return 1 << drv;
+		}
+	}
+#endif
+	return 0;
 }
 
 void VM::open_hard_disk(int drv, const _TCHAR* file_path)
@@ -975,12 +1017,12 @@ void VM::update_config()
 void VM::update_dipswitch()
 {
 	// bit0		0=High 1=Standard
-	// bit1-3	000=5"2D 001=5"2DD 010=5"2HD
+	// bit1-3	000=5"2D 001=5"2DD 010=5"2HD 110=8"1S 111=SASI
 	io->set_iovalue_single_r(0x1ff0, (config.monitor_type & 1) | ((config.drive_type & 7) << 1));
 }
 #endif
 
-#define STATE_VERSION	11
+#define STATE_VERSION	12
 
 bool VM::process_state(FILEIO* state_fio, bool loading)
 {
@@ -988,8 +1030,8 @@ bool VM::process_state(FILEIO* state_fio, bool loading)
 		return false;
 	}
 	for(DEVICE* device = first_device; device; device = device->next_device) {
-		const char *name = typeid(*device).name() + 6; // skip "class "
-		int len = strlen(name);
+		const _TCHAR *name = char_to_tchar(typeid(*device).name() + 6); // skip "class "
+		int len = (int)_tcslen(name);
 		
 		if(!state_fio->StateCheckInt32(len)) {
 			return false;

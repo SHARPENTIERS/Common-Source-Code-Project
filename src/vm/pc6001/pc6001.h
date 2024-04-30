@@ -65,10 +65,6 @@
 #define TIMER_PERIOD	(2000 / .999)
 #endif
 
-//memory wait
-#define Z80_MEMORY_WAIT
-#define Z80_IO_WAIT
-
 // device informations for virtual machine
 #define FRAMES_PER_SEC		60
 #define LINES_PER_FRAME		262
@@ -158,7 +154,7 @@ class FLOPPY;
 #endif
 class JOYSTICK;
 class MEMORY;
-class PSUB;
+//class PSUB;
 class SUB;
 class TIMER;
 
@@ -194,7 +190,7 @@ protected:
 #endif
 	JOYSTICK* joystick;
 	MEMORY* memory;
-	PSUB* psub;
+//	PSUB* psub;
 	TIMER* timer;
 	
 	MCS48* cpu_sub;

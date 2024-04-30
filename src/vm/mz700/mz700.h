@@ -13,36 +13,40 @@
 #define _MZ700_H_
 
 #if defined(_MZ700)
-#define DEVICE_NAME		"SHARP MZ-700"
+#if defined(_PAL)
+#define DEVICE_NAME		"SHARP MZ-700 (PAL)"
+#define CONFIG_NAME		"mz700pal"
+#else
+#define DEVICE_NAME		"SHARP MZ-700 (NTSC)"
 #define CONFIG_NAME		"mz700"
+#endif
 #elif defined(_MZ800)
 #define DEVICE_NAME		"SHARP MZ-800"
 #define CONFIG_NAME		"mz800"
+#define _PAL
 #elif defined(_MZ1500)
 #define DEVICE_NAME		"SHARP MZ-1500"
 #define CONFIG_NAME		"mz1500"
 #endif
 
 // device informations for virtual machine
-#if defined(_MZ800)
-#define FRAMES_PER_SEC		(3546895.0 / 228.0 / 312.0)
-#define LINES_PER_FRAME		312
+#if defined(_PAL)
 #define CPU_CLOCKS		3546895
+//#define PHI_CLOCKS		(CPU_CLOCKS * 5)
+#define PHI_CLOCKS		(CPU_CLOCKS * 1136.0 / 228.0)
+#define LINES_PER_FRAME		312
+#define FRAMES_PER_SEC		(PHI_CLOCKS / 1136.0 / LINES_PER_FRAME)
 #else
-#define FRAMES_PER_SEC		(3579545.0 / 228.0 / 262.0)
-#define LINES_PER_FRAME		262
 #define CPU_CLOCKS		3579545
+#define PHI_CLOCKS		(CPU_CLOCKS * 4.0)
+#define LINES_PER_FRAME		262
+#define FRAMES_PER_SEC		(PHI_CLOCKS / 912.0 / LINES_PER_FRAME)
 #endif
 #define SCREEN_WIDTH		640
 #define SCREEN_HEIGHT		400
 #define WINDOW_HEIGHT_ASPECT	480
-#define IO_ADDR_MAX		0x100
-#define Z80_MEMORY_WAIT
-#define Z80_IO_WAIT
-#if defined(_MZ800) || defined(_MZ1500)
 #define MAX_DRIVE		4
 #define HAS_MB8876
-#endif
 #if defined(_MZ1500)
 #define MZ1P17_SW1_4_ON
 #endif
@@ -54,16 +58,17 @@
 #define USE_BOOT_MODE		2
 #endif
 #define USE_TAPE		1
-#if defined(_MZ800) || defined(_MZ1500)
 #define USE_FLOPPY_DISK		2
 #define USE_QUICK_DISK		1
-#endif
 #define USE_AUTO_KEY		5
 #define USE_AUTO_KEY_RELEASE	6
 #define USE_AUTO_KEY_CAPS
 #if defined(_MZ700) || defined(_MZ1500)
 #define USE_AUTO_KEY_NUMPAD
 #define USE_VM_AUTO_KEY_TABLE
+#define USE_JOYSTICK
+#define USE_JOYSTICK_TYPE	3
+#define USE_JOY_BUTTON_CAPTIONS
 #endif
 #if defined(_MZ800)
 #define USE_MONITOR_TYPE	2
@@ -71,11 +76,11 @@
 #define USE_SCREEN_FILTER
 #define USE_SCANLINE
 #if defined(_MZ700)
-#define USE_SOUND_VOLUME	3
-#elif defined(_MZ800)
 #define USE_SOUND_VOLUME	5
-#elif defined(_MZ1500)
+#elif defined(_MZ800)
 #define USE_SOUND_VOLUME	6
+#elif defined(_MZ1500)
+#define USE_SOUND_VOLUME	7
 #endif
 #if defined(_MZ1500)
 #define USE_PRINTER
@@ -165,11 +170,20 @@ static const _TCHAR *sound_device_caption[] = {
 #elif defined(_MZ1500)
 	_T("PSG #1"), _T("PSG #2"),
 #endif
-	_T("Beep"), _T("CMT (Signal)"),
-#if defined(_MZ800) || defined(_MZ1500)
-	_T("Noise (FDD)"),
+	_T("Beep"), _T("CMT (Signal)"), _T("Noise (CMT)"), _T("Noise (FDD)"), _T("Noise (QD)"),
+};
 #endif
-	_T("Noise (CMT)"),
+
+#ifdef USE_JOY_BUTTON_CAPTIONS
+static const _TCHAR *joy_button_captions[] = {
+	_T("Up"),
+	_T("Down"),
+	_T("Left"),
+	_T("Right"),
+	_T("Button #1"),
+	_T("Button #2"),
+	_T("Run"),
+	_T("Select"),
 };
 #endif
 
@@ -182,27 +196,30 @@ class DATAREC;
 class I8253;
 class I8255;
 class IO;
+class MB8877;
 class PCM1BIT;
 class Z80;
+class Z80SIO;
 
-//class CMOS;
+class CMOS;
 class EMM;
+class FLOPPY;
 class KANJI;
 class KEYBOARD;
 class MEMORY;
+class QUICKDISK;
 class RAMFILE;
 
 #if defined(_MZ800) || defined(_MZ1500)
-class MB8877;
 class NOT;
 class SN76489AN;
 class Z80PIO;
-class Z80SIO;
-class FLOPPY;
 #if defined(_MZ1500)
 class PSG;
 #endif
-class QUICKDISK;
+#endif
+#if defined(_MZ700) || defined(_MZ1500)
+class JOYSTICK;
 #endif
 
 class VM : public VM_TEMPLATE
@@ -218,19 +235,22 @@ protected:
 	I8253* pit;
 	I8255* pio;
 	IO* io;
+	MB8877* fdc;
 	PCM1BIT* pcm;
 	Z80* cpu;
+	Z80SIO* sio_qd;	// QD
 	
-//	CMOS* cmos;
+	CMOS* cmos;
 	EMM* emm;
+	FLOPPY* floppy;
 	KANJI* kanji;
 	KEYBOARD* keyboard;
 	MEMORY* memory;
 	RAMFILE* ramfile;
+	QUICKDISK* qd;
 	
 #if defined(_MZ800) || defined(_MZ1500)
 	AND* and_snd;
-	MB8877* fdc;
 #if defined(_MZ800)
 	NOT* not_pit;
 	SN76489AN* psg;
@@ -243,16 +263,18 @@ protected:
 #endif
 	Z80PIO* pio_int;
 	Z80SIO* sio_rs;	// RS-232C
-	Z80SIO* sio_qd;	// QD
 	
-	FLOPPY* floppy;
 #if defined(_MZ1500)
 	PSG* psg;
 #endif
-	QUICKDISK* qd;
+#endif
+#if defined(_MZ700) || defined(_MZ1500)
+	JOYSTICK* joystick;
 #endif
 	
-#if defined(_MZ800)
+#if defined(_MZ700)
+	int dipswitch;
+#elif defined(_MZ800)
 	int boot_mode;
 #endif
 	
@@ -307,7 +329,6 @@ public:
 	void push_fast_rewind(int drv);
 	void push_apss_forward(int drv) {}
 	void push_apss_rewind(int drv) {}
-#if defined(_MZ800) || defined(_MZ1500)
 	void open_quick_disk(int drv, const _TCHAR* file_path);
 	void close_quick_disk(int drv);
 	bool is_quick_disk_inserted(int drv);
@@ -318,7 +339,6 @@ public:
 	void is_floppy_disk_protected(int drv, bool value);
 	bool is_floppy_disk_protected(int drv);
 	uint32_t is_floppy_disk_accessed();
-#endif
 	bool is_frame_skippable();
 	
 	void update_config();

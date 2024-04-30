@@ -65,7 +65,10 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	pit = new I8253(this, emu);
 	pio0 = new I8255(this, emu);
 	pic = new I8259(this, emu);
+	pic->num_chips = 2;
 	io = new IO(this, emu);
+	io->space = 0x8000;
+	io->bus_width = 16;
 	fdc = new MB8877(this, emu);
 	fdc->set_context_noise_seek(new NOISE(this, emu));
 	fdc->set_context_noise_head_down(new NOISE(this, emu));
@@ -78,7 +81,8 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 		sasi_hdd[i] = new SASI_HDD(this, emu);
 		sasi_hdd[i]->set_device_name(_T("SASI Hard Disk Drive #%d"), i + 1);
 		sasi_hdd[i]->scsi_id = i;
-		sasi_hdd[i]->bytes_per_sec = 32 * 1024; // 32KB/s
+//		sasi_hdd[i]->bytes_per_sec = 32 * 1024; // 32KB/s
+		sasi_hdd[i]->bytes_per_sec = 3600 / 60 * 1024 * 8; // 3600rpm, 1024bytes x 8sectors in track (thanks Mr.Sato)
 		sasi_hdd[i]->set_context_interface(sasi_host);
 		sasi_host->set_context_target(sasi_hdd[i]);
 	}
@@ -137,6 +141,7 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	sasi_host->set_context_msg(sasi, SIG_SASI_MSG, 1);
 	sasi_host->set_context_req(sasi, SIG_SASI_REQ, 1);
 	sasi_host->set_context_ack(sasi, SIG_SASI_ACK, 1);
+	dma->set_context_cpu(cpu);
 	dma->set_context_memory(memory);
 	dma->set_context_ch0(sasi);
 	dma->set_context_ch1(fdc);
@@ -459,8 +464,8 @@ bool VM::process_state(FILEIO* state_fio, bool loading)
 		return false;
 	}
 	for(DEVICE* device = first_device; device; device = device->next_device) {
-		const char *name = typeid(*device).name() + 6; // skip "class "
-		int len = strlen(name);
+		const _TCHAR *name = char_to_tchar(typeid(*device).name() + 6); // skip "class "
+		int len = (int)_tcslen(name);
 		
 		if(!state_fio->StateCheckInt32(len)) {
 			return false;

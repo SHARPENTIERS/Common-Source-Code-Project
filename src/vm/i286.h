@@ -3,12 +3,12 @@
 
 	Origin : MAME i286 core
 	Author : Takeda.Toshiya
-	Date  : 2012.10.18-
+	Date   : 2012.10.18-
 
-	[ i286 ]
+	[ 80286 ]
 */
 
-#ifndef _I286_H_ 
+#ifndef _I286_H_
 #define _I286_H_
 
 #include "vm.h"
@@ -46,17 +46,7 @@ public:
 #ifdef SINGLE_MODE_DMA
 		d_dma = NULL;
 #endif
-#if defined(HAS_I86)
-		set_device_name(_T("8086 CPU"));
-#elif defined(HAS_I88)
-		set_device_name(_T("8088 CPU"));
-#elif defined(HAS_I186)
-		set_device_name(_T("80186 CPU"));
-#elif defined(HAS_V30)
-		set_device_name(_T("V30 CPU"));
-#elif defined(HAS_I286)
 		set_device_name(_T("80286 CPU"));
-#endif
 	}
 	~I286() {}
 	
@@ -86,19 +76,11 @@ public:
 	}
 	uint32_t get_debug_prog_addr_mask()
 	{
-#ifdef HAS_I286
 		return 0xffffff;
-#else
-		return 0xfffff;
-#endif
 	}
 	uint32_t get_debug_data_addr_mask()
 	{
-#ifdef HAS_I286
 		return 0xffffff;
-#else
-		return 0xfffff;
-#endif
 	}
 	void write_debug_data8(uint32_t addr, uint32_t data);
 	uint32_t read_debug_data8(uint32_t addr);
@@ -146,12 +128,10 @@ public:
 		d_debugger = device;
 	}
 #endif
-#ifdef HAS_I286
 	void set_address_mask(uint32_t mask);
 	uint32_t get_address_mask();
 	void set_shutdown_flag(int shutdown);
 	int get_shutdown_flag();
-#endif
 };
 
 #endif

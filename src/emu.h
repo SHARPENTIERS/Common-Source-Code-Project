@@ -17,6 +17,8 @@
 //	#define _FDC_DEBUG_LOG
 	// output scsi debug log
 //	#define _SCSI_DEBUG_LOG
+	// output dma debug log
+//	#define _DMA_DEBUG_LOG
 	// output i/o debug log
 //	#define _IO_DEBUG_LOG
 #endif
@@ -118,6 +120,9 @@ private:
 #endif
 #ifdef USE_PRINTER_TYPE
 	int printer_type;
+#endif
+#ifdef USE_SERIAL_TYPE
+	int serial_type;
 #endif
 	bool now_suspended;
 	
@@ -360,7 +365,7 @@ public:
 	
 	// socket
 #ifdef USE_SOCKET
-	int get_socket(int ch);
+	SOCKET get_socket(int ch);
 	void notify_socket_connected(int ch);
 	void notify_socket_disconnected(int ch);
 	bool initialize_socket_tcp(int ch);
@@ -374,12 +379,22 @@ public:
 	void recv_socket_data(int ch);
 #endif
 	
+	// midi
+#ifdef USE_MIDI
+	void send_to_midi(uint8_t data);
+	bool recv_from_midi(uint8_t *data);
+#endif
+	
 	// debugger
 #ifdef USE_DEBUGGER
 	void open_debugger(int cpu_index);
 	void close_debugger();
 	bool is_debugger_enabled(int cpu_index);
 	bool now_debugging;
+#ifdef USE_STATE
+	int debugger_cpu_index, debugger_target_id;
+	int request_save_state, request_load_state;
+#endif
 	debugger_thread_t debugger_thread_param;
 #if defined(OSD_QT)
 	pthread_t debugger_thread_id;
@@ -419,21 +434,25 @@ public:
 		int bank_num;
 		int cur_bank;
 	} d88_file[USE_FLOPPY_DISK];
-	void create_bank_floppy_disk(const _TCHAR* file_path, uint8_t type);
+	bool create_blank_floppy_disk(const _TCHAR* file_path, uint8_t type);
 	void open_floppy_disk(int drv, const _TCHAR* file_path, int bank);
 	void close_floppy_disk(int drv);
+	bool is_floppy_disk_connected(int drv);
 	bool is_floppy_disk_inserted(int drv);
 	void is_floppy_disk_protected(int drv, bool value);
 	bool is_floppy_disk_protected(int drv);
 	uint32_t is_floppy_disk_accessed();
+	uint32_t floppy_disk_indicator_color();
 #endif
 #ifdef USE_QUICK_DISK
 	void open_quick_disk(int drv, const _TCHAR* file_path);
 	void close_quick_disk(int drv);
+	bool is_quick_disk_connected(int drv);
 	bool is_quick_disk_inserted(int drv);
 	uint32_t is_quick_disk_accessed();
 #endif
 #ifdef USE_HARD_DISK
+	bool create_blank_hard_disk(const _TCHAR* file_path, int sector_size, int sectors, int surfaces, int cylinders);
 	void open_hard_disk(int drv, const _TCHAR* file_path);
 	void close_hard_disk(int drv);
 	bool is_hard_disk_inserted(int drv);
@@ -496,6 +515,7 @@ public:
 #ifdef USE_STATE
 	void save_state(const _TCHAR* file_path);
 	void load_state(const _TCHAR* file_path);
+	const _TCHAR *state_file_path(int num);
 #endif
 #ifdef OSD_QT
 	// New APIs

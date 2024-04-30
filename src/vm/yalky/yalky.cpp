@@ -30,7 +30,8 @@
 
 VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 {
-	config.sound_play_tape = false;
+	config.sound_tape_signal = false;
+	config.sound_tape_voice = true;
 	config.wave_shaper[0] = false;
 	
 	// create devices
@@ -45,6 +46,8 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	cpu = new I8080(this, emu);	// 8085
 	pio = new I8155(this, emu);	// 8156
 	memory = new MEMORY(this, emu);
+	memory->space = 0x10000;
+	memory->bank_size = 0x100;
 	
 	io = new IO(this, emu);
 	
@@ -301,8 +304,8 @@ bool VM::process_state(FILEIO* state_fio, bool loading)
 		return false;
 	}
 	for(DEVICE* device = first_device; device; device = device->next_device) {
-		const char *name = typeid(*device).name() + 6; // skip "class "
-		int len = strlen(name);
+		const _TCHAR *name = char_to_tchar(typeid(*device).name() + 6); // skip "class "
+		int len = (int)_tcslen(name);
 		
 		if(!state_fio->StateCheckInt32(len)) {
 			return false;

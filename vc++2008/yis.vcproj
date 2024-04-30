@@ -835,6 +835,26 @@
 					</FileConfiguration>
 				</File>
 				<File
+					RelativePath="..\src\vm\yis\membus.cpp"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+				</File>
+				<File
 					RelativePath="..\src\vm\yis\sound.cpp"
 					>
 					<FileConfiguration
@@ -1012,6 +1032,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\src\vm\yis\membus.h"
+					>
+				</File>
+				<File
 					RelativePath="..\src\vm\yis\sound.h"
 					>
 				</File>
@@ -1025,6 +1049,22 @@
 			Name="Resource Files"
 			Filter="ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe"
 			>
+			<File
+				RelativePath="..\src\res\indicator\access_green.bmp"
+				>
+			</File>
+			<File
+				RelativePath="..\src\res\indicator\access_off.bmp"
+				>
+			</File>
+			<File
+				RelativePath="..\src\res\indicator\access_on.bmp"
+				>
+			</File>
+			<File
+				RelativePath="..\src\res\resource.h"
+				>
+			</File>
 			<File
 				RelativePath="..\src\res\yis.ico"
 				>
@@ -1050,10 +1090,6 @@
 						AdditionalIncludeDirectories="..\src\res"
 					/>
 				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="..\src\res\resource.h"
-				>
 			</File>
 		</Filter>
 	</Files>

@@ -38,11 +38,11 @@ void HARDDISK::open(const _TCHAR* file_path, int default_sector_size)
 				tmp.read_2bytes_le_from(header + 0);
 				int cylinders = tmp.sd;
 				surfaces = 8;
-				int sectors = 33;
+				sectors = 33;
 				sector_size = 256;
 				sector_num = cylinders * surfaces * sectors;
 			} else if(check_file_extension(file_path, _T(".nhd")) && memcmp(header, sig_nhd, 15) == 0) {
-				// T98Next
+				// T98-Next
 /*
 				typedef struct nhd_header_s {
 					char sig[16];
@@ -62,7 +62,7 @@ void HARDDISK::open(const _TCHAR* file_path, int default_sector_size)
 				tmp.read_2bytes_le_from(header + 280);
 				surfaces = tmp.sd;
 				tmp.read_2bytes_le_from(header + 282);
-				int sectors = tmp.sd;
+				sectors = tmp.sd;
 				tmp.read_2bytes_le_from(header + 284);
 				sector_size = tmp.sd;
 				sector_num = cylinders * surfaces * sectors;
@@ -85,7 +85,7 @@ void HARDDISK::open(const _TCHAR* file_path, int default_sector_size)
 				tmp.read_4bytes_le_from(header + 16);
 				sector_size = tmp.sd;
 				tmp.read_4bytes_le_from(header + 20);
-				int sectors = tmp.sd;
+				sectors = tmp.sd;
 				tmp.read_4bytes_le_from(header + 24);
 				surfaces = tmp.sd;
 				tmp.read_4bytes_le_from(header + 28);
@@ -112,7 +112,7 @@ void HARDDISK::open(const _TCHAR* file_path, int default_sector_size)
 				header_size = 288;
 				tmp.read_2bytes_le_from(header + 142);
 				sector_size = tmp.sd;
-//				int sectors = header[144];
+				sectors = header[144];
 				surfaces = header[145];
 //				tmp.read_2bytes_le_from(header + 146);
 //				int cylinders = tmp.sd;
@@ -122,9 +122,16 @@ void HARDDISK::open(const _TCHAR* file_path, int default_sector_size)
 			} else {
 				// solid
 				header_size = 0;
-				// sectors = 33, surfaces = 4, cylinders = 153, sector_size = 256	// 5MB
-				// sectors = 33, surfaces = 4, cylinders = 310, sector_size = 256	// 10MB
-				surfaces = (default_sector_size == 256 && fio->FileLength() <= 33 * 4 * 310 * 256) ? 4 : 8;
+				// sectors = 33/17, surfaces = 4, cylinders = 153, sector_size = 256/512	// 5MB
+				// sectors = 33/17, surfaces = 4, cylinders = 310, sector_size = 256/512	// 10MB
+				// sectors = 33/17, surfaces = 4, cylinders = 615, sector_size = 256/512	// 20MB
+				// sectors = 33/17, surfaces = 8, cylinders = 615, sector_size = 256/512	// 40MB
+#if 0
+				surfaces = (fio->FileLength() <= 17 * 4 * 615 * 512) ? 4 : 8;
+#else
+				surfaces = ((int)(fio->FileLength() / 1024 / 1024) < 24) ? 4 : 8;
+#endif
+				sectors = (default_sector_size == 1024) ? 8 : (default_sector_size == 512) ? 17 : 33;
 				sector_size = default_sector_size;
 				sector_num = fio->FileLength() / sector_size;
 			}

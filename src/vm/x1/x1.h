@@ -51,9 +51,7 @@
 #define SCREEN_HEIGHT		400
 #define WINDOW_HEIGHT_ASPECT	480
 #define MAX_DRIVE		4
-#define IO_ADDR_MAX		0x10000
 #define HAS_AY_3_8910
-#define Z80_IO_WAIT
 #ifdef _X1TURBO_FEATURE
 #define SINGLE_MODE_DMA
 #endif
@@ -61,6 +59,7 @@
 #define DATAREC_FAST_REW_SPEED	16
 #define PRINTER_STROBE_RISING_EDGE
 #define SCSI_HOST_AUTO_ACK
+#define OVERRIDE_SOUND_FREQ_48000HZ	62500
 
 #ifdef _X1TURBO_FEATURE
 #define IPL_ROM_FILE_SIZE	0x8000
@@ -89,9 +88,9 @@
 #define USE_KEYBOARD_TYPE	2
 // Keyboard mode B
 #define KEYBOARD_TYPE_DEFAULT	1
-#define USE_DRIVE_TYPE		3
+#define USE_DRIVE_TYPE		8
 #endif
-#define USE_FLOPPY_DISK		2
+#define USE_FLOPPY_DISK		4
 #define BASE_FLOPPY_DISK_NUM	0
 #define USE_HARD_DISK		4
 #define USE_TAPE		1
@@ -109,9 +108,9 @@
 // CZ-8BS1 x1
 #define SOUND_TYPE_DEFAULT	1
 #if defined(_X1TWIN)
-#define USE_SOUND_VOLUME	7
+#define USE_SOUND_VOLUME	8
 #else
-#define USE_SOUND_VOLUME	6
+#define USE_SOUND_VOLUME	7
 #endif
 #define USE_JOYSTICK
 #ifdef _X1TWIN
@@ -121,7 +120,7 @@
 #endif
 #define USE_MOUSE
 #define USE_PRINTER
-#define USE_PRINTER_TYPE	4
+#define USE_PRINTER_TYPE	5
 #define USE_DEBUGGER
 #define USE_STATE
 
@@ -131,7 +130,7 @@
 
 #ifdef USE_SOUND_VOLUME
 static const _TCHAR *sound_device_caption[] = {
-	_T("PSG"), _T("CZ-8BS1 #1"), _T("CZ-8BS1 #2"), _T("CMT (Signal)"), _T("Noise (FDD)"), _T("Noise (CMT)"),
+	_T("PSG"), _T("CZ-8BS1 #1"), _T("CZ-8BS1 #2"), _T("JAST SOUND"), _T("CMT (Signal)"), _T("Noise (FDD)"), _T("Noise (CMT)"),
 #if defined(_X1TWIN)
 	_T("PC Engine PSG"),
 #endif
@@ -261,6 +260,7 @@ class MEMORY;
 class MOUSE;
 class PSUB;
 class SASI;
+class CZ8RB;
 
 class MCS48;
 class UPD1990A;
@@ -310,6 +310,7 @@ protected:
 	MOUSE* mouse;
 	PSUB* psub;
 	SASI* sasi;
+	CZ8RB* cz8rb;
 	
 	MCS48* cpu_sub;
 	UPD1990A* rtc_sub;
@@ -377,6 +378,7 @@ public:
 	void is_floppy_disk_protected(int drv, bool value);
 	bool is_floppy_disk_protected(int drv);
 	uint32_t is_floppy_disk_accessed();
+	uint32_t floppy_disk_indicator_color();
 	void open_hard_disk(int drv, const _TCHAR* file_path);
 	void close_hard_disk(int drv);
 	bool is_hard_disk_inserted(int drv);

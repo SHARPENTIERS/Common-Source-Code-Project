@@ -57,18 +57,20 @@ private:
 	uint64_t prev_total_icount;
 #endif
 	int icount;
-	int extra_icount;
-	int busreq_icount;
+	int dma_icount;
+	int wait_icount, event_icount, in_op_icount;
 	uint16_t prevpc;
 	pair32_t pc, sp, af, bc, de, hl, ix, iy, wz;
 	pair32_t af2, bc2, de2, hl2;
 	uint8_t I, R, R2;
 	uint32_t ea;
 	
-	bool busreq, after_halt;
+	bool busreq, wait, after_halt;
 	uint8_t im, iff1, iff2, icr;
-	bool after_ei, after_ldair;
+	bool after_di, after_ei, prev_after_ei;
+	bool after_ldair;
 	uint32_t intr_req_bit, intr_pend_bit;
+	bool intr_enb;
 	
 	inline uint8_t RM8(uint32_t addr);
 	inline void WM8(uint32_t addr, uint8_t val);
@@ -114,7 +116,7 @@ public:
 #ifdef USE_DEBUGGER
 		total_icount = prev_total_icount = 0;
 #endif
-		busreq = false;
+		busreq = wait = false;
 #ifdef Z80_PSEUDO_BIOS
 		d_bios = NULL;
 #endif
@@ -130,6 +132,7 @@ public:
 	// common functions
 	void initialize();
 	void reset();
+	void special_reset();
 	int run(int clock);
 	void write_signal(int id, uint32_t data, uint32_t mask);
 	uint32_t read_signal(int id);
@@ -141,11 +144,11 @@ public:
 	}
 	void set_extra_clock(int clock)
 	{
-		extra_icount += clock;
+		dma_icount += clock;
 	}
 	int get_extra_clock()
 	{
-		return extra_icount;
+		return dma_icount;
 	}
 	uint32_t get_pc()
 	{
@@ -232,6 +235,10 @@ public:
 	void set_sp(uint16_t value)
 	{
 		sp.w.l = value;
+	}
+	void set_intr_enb(bool value)
+	{
+		intr_enb = value;
 	}
 };
 

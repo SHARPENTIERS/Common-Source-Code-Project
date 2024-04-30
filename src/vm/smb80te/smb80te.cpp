@@ -41,6 +41,7 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	drec->set_context_noise_stop(new NOISE(this, emu));
 	drec->set_context_noise_fast(new NOISE(this, emu));
 	io = new IO(this, emu);
+	io->space = 0x100;
 	not_ear = new NOT(this, emu);
 	cpu = new Z80(this, emu);
 	pio1 = new Z80PIO(this, emu);
@@ -327,8 +328,8 @@ bool VM::process_state(FILEIO* state_fio, bool loading)
 		return false;
 	}
 	for(DEVICE* device = first_device; device; device = device->next_device) {
-		const char *name = typeid(*device).name() + 6; // skip "class "
-		int len = strlen(name);
+		const _TCHAR *name = char_to_tchar(typeid(*device).name() + 6); // skip "class "
+		int len = (int)_tcslen(name);
 		
 		if(!state_fio->StateCheckInt32(len)) {
 			return false;

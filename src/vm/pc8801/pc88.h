@@ -27,13 +27,21 @@
 #ifdef SUPPORT_PC88_OPN2
 #define SIG_PC88_OPN2_IRQ	2
 #endif
+#ifdef SUPPORT_PC88_FDD_8INCH
+#define SIG_PC88_8INCH_IRQ	3
+#define SIG_PC88_8INCH_DRQ	4
+#endif
 #ifdef SUPPORT_PC88_CDROM
-#define SIG_PC88_SCSI_DRQ	3
+#define SIG_PC88_SCSI_DRQ	5
 #endif
 #ifdef SUPPORT_PC88_GSX8800
-#define SIG_PC88_GSX_IRQ	4
+#define SIG_PC88_GSX_IRQ	6
 #endif
-#define SIG_PC88_USART_OUT	5
+#define SIG_PC88_USART_OUT	7
+#ifdef SUPPORT_PC88_16BIT
+#define SIG_PC88_16BIT_PORTA	8
+#define SIG_PC88_16BIT_PORTC	9
+#endif
 
 #define CMT_BUFFER_SIZE		0x40000
 
@@ -49,6 +57,9 @@
 class YM2203;
 #endif
 class Z80;
+#ifdef SUPPORT_PC88_FDD_8INCH
+class UPD765A;
+#endif
 #ifdef SUPPORT_PC88_CDROM
 class SCSI_HOST;
 class SCSI_CDROM;
@@ -119,17 +130,20 @@ typedef struct {
 class PC88 : public DEVICE
 {
 private:
+	Z80 *d_cpu;
+	DEVICE *d_pcm, *d_pio, *d_prn, *d_rtc, *d_sio;
+#ifdef SUPPORT_PC88_FDD_8INCH
+	UPD765A *d_fdc_8inch;
+#endif
+#ifdef SUPPORT_PC88_CDROM
+	SCSI_HOST* d_scsi_host;
+	SCSI_CDROM* d_scsi_cdrom;
+#endif
 #ifdef SUPPORT_PC88_OPN1
 	YM2203 *d_opn1;
 #endif
 #ifdef SUPPORT_PC88_OPN2
 	YM2203 *d_opn2;
-#endif
-	Z80 *d_cpu;
-	DEVICE *d_pcm, *d_pio, *d_prn, *d_rtc, *d_sio;
-#ifdef SUPPORT_PC88_CDROM
-	SCSI_HOST* d_scsi_host;
-	SCSI_CDROM* d_scsi_cdrom;
 #endif
 #ifdef SUPPORT_PC88_HMB20
 	DEVICE *d_opm;
@@ -140,6 +154,12 @@ private:
 #endif
 #ifdef SUPPORT_PC88_PCG8100
 	DEVICE *d_pcg_pit, *d_pcg_pcm1, *d_pcg_pcm2, *d_pcg_pcm3;
+#endif
+#ifdef SUPPORT_PC88_16BIT
+	DEVICE *d_pio_16bit;
+#endif
+#ifdef SUPPORT_M88_DISKDRV
+	DEVICE *d_diskio;
 #endif
 	
 	uint8_t* rbank[16];
@@ -160,13 +180,20 @@ private:
 #endif
 #if defined(PC8001_VARIANT)
 	uint8_t n80rom[0x8000];
+#if defined(_PC8001MK2) || defined(_PC8001SR)
+	uint8_t n80erom[0x2000];
+#endif
 #if defined(_PC8001SR)
 	uint8_t n80srrom[0xa000];
+	uint8_t hiragana[0x200];
+	uint8_t katakana[0x200];
 #endif
 #else
 	uint8_t n88rom[0x8000];
 	uint8_t n88exrom[0x8000];
 	uint8_t n80rom[0x8000];
+	uint8_t n88erom[9][0x2000];
+	int n88erom_loaded;
 #endif
 //#ifdef SUPPORT_PC88_KANJI1
 	uint8_t kanji1[0x20000];
@@ -181,9 +208,14 @@ private:
 	uint8_t cdbios[0x10000];
 	bool cdbios_loaded;
 #endif
+#ifdef SUPPORT_PC88_16BIT
+	uint8_t boot_16bit[0x2000];
+	bool boot_16bit_loaded;
+#endif
 	
 	// i/o port
 	uint8_t port[256];
+	uint8_t prev_port[256];
 	
 	pc88_crtc_t crtc;
 	pc88_dmac_t dmac;
@@ -212,7 +244,9 @@ private:
 	void update_n80_read();
 #else
 	void update_low_write();
+	void update_low_write_sub();
 	void update_low_read();
+	void update_low_read_sub();
 #if defined(PC8801SR_VARIANT)
 	void update_tvram_memmap();
 #endif
@@ -270,7 +304,7 @@ private:
 	bool draw_640x200_color_graph();
 	void draw_640x200_mono_graph();
 	void draw_640x200_attrib_graph();
-#if defined(PC8801SR_VARIANT)
+#if defined(PC8801_VARIANT)
 	void draw_640x400_mono_graph();
 	void draw_640x400_attrib_graph();
 #endif
@@ -334,6 +368,11 @@ private:
 	double cdda_volume;
 #endif
 	
+#ifdef SUPPORT_PC88_16BIT
+	uint8_t porta_16bit;
+	uint8_t portc_16bit;
+#endif
+	
 #ifdef NIPPY_PATCH
 	// dirty patch for NIPPY
 	bool nippy_patch;
@@ -342,6 +381,9 @@ private:
 public:
 	PC88(VM_TEMPLATE* parent_vm, EMU* parent_emu) : DEVICE(parent_vm, parent_emu)
 	{
+#ifdef SUPPORT_PC88_FDD_8INCH
+		d_fdc_8inch = NULL;
+#endif
 #ifdef SUPPORT_PC88_OPN1
 		d_opn1 = NULL;
 #endif
@@ -363,6 +405,12 @@ public:
 		d_pcg_pcm1 = NULL;
 		d_pcg_pcm2 = NULL;
 		d_pcg_pcm3 = NULL;
+#endif
+#ifdef SUPPORT_PC88_16BIT
+		d_pio_16bit = NULL;
+#endif
+#ifdef SUPPORT_M88_DISKDRV
+		d_diskio = NULL;
 #endif
 #if defined(PC8001_VARIANT)
 		set_device_name(_T("PC-8001 Core"));
@@ -409,18 +457,6 @@ public:
 	{
 		d_cpu = device;
 	}
-#ifdef SUPPORT_PC88_OPN1
-	void set_context_opn1(YM2203* device)
-	{
-		d_opn1 = device;
-	}
-#endif
-#ifdef SUPPORT_PC88_OPN2
-	void set_context_opn2(YM2203* device)
-	{
-		d_opn2 = device;
-	}
-#endif
 	void set_context_pcm(DEVICE* device)
 	{
 		d_pcm = device;
@@ -441,6 +477,12 @@ public:
 	{
 		d_sio = device;
 	}
+#ifdef SUPPORT_PC88_FDD_8INCH
+	void set_context_fdc_8inch(UPD765A* device)
+	{
+		d_fdc_8inch = device;
+	}
+#endif
 #ifdef SUPPORT_PC88_CDROM
 	void set_context_scsi_host(SCSI_HOST* device)
 	{
@@ -449,6 +491,18 @@ public:
 	void set_context_scsi_cdrom(SCSI_CDROM* device)
 	{
 		d_scsi_cdrom = device;
+	}
+#endif
+#ifdef SUPPORT_PC88_OPN1
+	void set_context_opn1(YM2203* device)
+	{
+		d_opn1 = device;
+	}
+#endif
+#ifdef SUPPORT_PC88_OPN2
+	void set_context_opn2(YM2203* device)
+	{
+		d_opn2 = device;
 	}
 #endif
 #ifdef SUPPORT_PC88_HMB20
@@ -495,6 +549,18 @@ public:
 	void set_context_pcg_pcm3(DEVICE* device)
 	{
 		d_pcg_pcm3 = device;
+	}
+#endif
+#ifdef SUPPORT_PC88_16BIT
+	void set_context_pio_16bit(DEVICE* device)
+	{
+		d_pio_16bit = device;
+	}
+#endif
+#ifdef SUPPORT_M88_DISKDRV
+	void set_context_diskio(DEVICE* device)
+	{
+		d_diskio = device;
 	}
 #endif
 	void key_down(int code, bool repeat);

@@ -18,6 +18,7 @@ void OSD::initialize(int rate, int samples)
 	vista_or_later = (os_info.dwPlatformId == 2 && (os_info.dwMajorVersion > 6 || (os_info.dwMajorVersion == 6 && os_info.dwMinorVersion >= 0)));
 	
 	GdiplusStartup(&gdiToken, &gdiSI, NULL);
+	initialize_console();
 	initialize_input();
 	initialize_screen();
 	initialize_sound(rate, samples);
@@ -28,10 +29,14 @@ void OSD::initialize(int rate, int samples)
 #ifdef USE_SOCKET
 	initialize_socket();
 #endif
+#ifdef USE_MIDI
+	initialize_midi();
+#endif
 }
 
 void OSD::release()
 {
+	release_console();
 	release_input();
 	release_screen();
 	release_sound();
@@ -41,6 +46,9 @@ void OSD::release()
 #endif
 #ifdef USE_SOCKET
 	release_socket();
+#endif
+#ifdef USE_MIDI
+	release_midi();
 #endif
 	GdiplusShutdown(gdiToken);
 }
@@ -127,8 +135,14 @@ void OSD::start_waiting_in_debugger()
 			}
 		}
 	}
+#ifdef _M_AMD64
+	// thanks Marukun (64bit)
+	hWndProc = (FARPROC)GetWindowLongPtr(main_window_handle, GWLP_WNDPROC);
+	SetWindowLongPtr(main_window_handle, GWLP_WNDPROC, (LONG_PTR)MyWndProc);
+#else
 	hWndProc = (FARPROC)GetWindowLong(main_window_handle, GWL_WNDPROC);
 	SetWindowLong(main_window_handle, GWL_WNDPROC, (LONG)MyWndProc);
+#endif
 	my_osd = this;
 }
 
@@ -143,7 +157,12 @@ void OSD::finish_waiting_in_debugger()
 			}
 		}
 	}
+#ifdef _M_AMD64
+	// thanks Marukun (64bit)
+	SetWindowLongPtr(main_window_handle, GWLP_WNDPROC, (LONG_PTR)hWndProc);
+#else
 	SetWindowLong(main_window_handle, GWL_WNDPROC, (LONG)hWndProc);
+#endif
 	my_osd = NULL;
 }
 
