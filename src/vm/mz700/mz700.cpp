@@ -39,6 +39,10 @@
 #include "quickdisk.h"
 #include "ramfile.h"
 
+#if defined(USE_ROMDISK)
+#include "sst39sf040.h"
+#endif
+
 #if defined(_MZ800) || defined(_MZ1500)
 #include "../not.h"
 #include "../sn76489an.h"
@@ -100,7 +104,11 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	ramfile = new RAMFILE(this, emu);
 	qd = new QUICKDISK(this, emu);
 	qd->set_context_noise_seek(new NOISE(this, emu));
-	
+
+#if defined(USE_ROMDISK)
+	sst39sf040 = new SST39SF040(this, emu);
+#endif
+
 #if defined(_MZ800) || defined(_MZ1500)
 	and_snd = new AND(this, emu);
 	and_snd->set_device_name(_T("AND Gate (Sound)"));
@@ -163,7 +171,12 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 #if defined(_MZ700) || defined(_MZ1500)
 	memory->set_context_joystick(joystick);
 #endif
-	
+
+#if defined(USE_ROMDISK)
+	// rom disks
+	memory->set_context_romdisk(0, sst39sf040);
+#endif
+
 	// floppy drives
 	floppy->set_context_cpu(cpu);
 	floppy->set_context_fdc(fdc);
@@ -382,7 +395,12 @@ VM::VM(EMU* parent_emu) : VM_TEMPLATE(parent_emu)
 	// printer
 	io->set_iovalue_single_r(0xfe, 0xc0);
 #endif
-	
+
+#if defined(USE_ROMDISK)
+	// rom/disk
+	io->set_iomap_single_r(0xff, memory);
+#endif
+
 	// initialize all devices
 	for(DEVICE* device = first_device; device; device = device->next_device) {
 		device->initialize();

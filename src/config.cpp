@@ -99,6 +99,13 @@ void initialize_config()
 			config.baud_high[drv] = true;
 		}
 	#endif
+	#if defined(USE_ROMDISK)
+		config.dipswitch &= ~(1 << 16);
+	#endif
+	#if defined(USE_COLOR_BLENDER)
+		config.dipswitch &= ~(1 << 17);
+	#endif
+
 	config.compress_state = config.drive_vm_in_opecode = true;
 	
 	// screen
@@ -462,6 +469,7 @@ void save_config(const _TCHAR* config_path)
 			MyWritePrivateProfileBool(_T("Control"), create_string(_T("BaudHigh%d"), drv + 1), config.baud_high[drv], config_path);
 		}
 	#endif
+
 	MyWritePrivateProfileBool(_T("Control"), _T("CompressState"), config.compress_state, config_path);
 	MyWritePrivateProfileBool(_T("Control"), _T("DriveVMInOpecode"), config.drive_vm_in_opecode, config_path);
 	

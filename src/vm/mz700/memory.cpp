@@ -88,6 +88,7 @@
 #else
 #define IPL_FILE_NAME	"IPL.ROM"
 #define EXT_FILE_NAME	"EXT.ROM"
+#define XCG_FILE_NAME	"XCG.ROM"
 #endif
 
 void MEMORY::initialize()
@@ -131,10 +132,24 @@ void MEMORY::initialize()
 		fio->Fclose();
 	}
 #endif
-	if(fio->Fopen(create_local_path(_T("FONT.ROM")), FILEIO_READ_BINARY)) {
+#if defined(_MZ700)
+	if (fio->Fopen(create_local_path(_T(XCG_FILE_NAME)), FILEIO_READ_BINARY)) {
+		if (fio->Fread(font, sizeof(font), 1) < sizeof(font)) {
+			memcpy(font + 0x1000, font, sizeof(font) / 2);
+		};
+		fio->Fclose();
+	} else
+#endif
+		if(fio->Fopen(create_local_path(_T("FONT.ROM")), FILEIO_READ_BINARY)) {
 		fio->Fread(font, sizeof(font), 1);
 		fio->Fclose();
 	}
+
+#if defined(USE_ROMDISK)
+	ipl_page = 0;
+	update_config();
+#endif
+
 	delete fio;
 	
 #if defined(_MZ700)
@@ -219,10 +234,22 @@ void MEMORY::reset()
 		palette[i] = i;
 	}
 #endif
-	
+
+#if defined(USE_ROMDISK)
+	// reset ROM/DISK page selector
+	ipl_storage = uint8_t(!!(config.dipswitch & (1 << 16)));
+#endif
+
 	// motor is always rotating...
 	d_pio->write_signal(SIG_I8255_PORT_C, 0xff, 0x10);
 }
+
+#if defined(USE_ROMDISK)
+void MEMORY::update_config()
+{
+	ipl_storage = uint8_t(!!(config.dipswitch & (1 << 16)));
+}
+#endif
 
 #if defined(_MZ800)
 void MEMORY::update_config()
@@ -621,13 +648,36 @@ uint32_t MEMORY::read_data8(uint32_t addr)
 
 void MEMORY::write_data8w(uint32_t addr, uint32_t data, int* wait)
 {
-	*wait = ((mem_bank & MEM_BANK_MON_L) && addr < 0x1000) ? 1 : 0;
+	*wait = 0;
+	if ((mem_bank & MEM_BANK_MON_L) && addr < 0x1000) {
+		*wait = 1;
+#if defined(USE_ROMDISK)
+		switch (ipl_storage) {
+		case 1: // flash 512KB
+			d_romdisk[ipl_storage - 1]->write_data8((ipl_page & 255) * 0x1000 + addr, data);
+			return;
+		default:
+				break;
+		}
+#endif
+	}
 	write_data8(addr, data);
 }
 
 uint32_t MEMORY::read_data8w(uint32_t addr, int* wait)
 {
-	*wait = ((mem_bank & MEM_BANK_MON_L) && addr < 0x1000) ? 1 : 0;
+	*wait = 0;
+	if ((mem_bank & MEM_BANK_MON_L) && addr < 0x1000) {
+		*wait = 1;
+#if defined(USE_ROMDISK)
+		switch (ipl_storage) {
+		case 1: // flash 512KB
+			return d_romdisk[ipl_storage - 1]->read_data8((ipl_page & 255) * 0x1000 + addr);
+		default:
+			break;
+		}
+#endif
+	}
 	return read_data8(addr);
 }
 
@@ -732,6 +782,18 @@ void MEMORY::write_io8(uint32_t addr, uint32_t data)
 #endif
 	}
 }
+
+#if defined(USE_ROMDISK)
+uint32_t MEMORY::read_io8(uint32_t addr)
+{
+	switch(addr & 0xff) {
+	case 0xff:
+		ipl_page = uint8_t(addr >> 8);
+		break;
+	}
+	return 0xff;
+}
+#endif
 
 #if defined(_MZ800)
 uint32_t MEMORY::read_io8(uint32_t addr)
@@ -931,7 +993,11 @@ void MEMORY::draw_line(int v)
 #if defined(_MZ1500)
 		uint8_t pcg_attr = vram[ptr | 0xc00];
 #endif
+#if defined(_MZ700)
+		uint16_t code = (vram[ptr] << 3) | ((attr & 0x80) << 4) | ((attr & 0x08) << 10);
+#else
 		uint16_t code = (vram[ptr] << 3) | ((attr & 0x80) << 4);
+#endif
 		uint8_t col_b = attr & 7;
 		uint8_t col_f = (attr >> 4) & 7;
 #if defined(_MZ700)
@@ -1011,19 +1077,28 @@ void MEMORY::draw_screen()
 	for(int y = 0; y < 200; y++) {
 		scrntype_t* dest0 = emu->get_screen_buffer(2 * y);
 		scrntype_t* dest1 = emu->get_screen_buffer(2 * y + 1);
+		uint8_t* old = screen_copy[y];
 		uint8_t* src = screen[y];
 		
 		for(int x = 0, x2 = 0; x < 320; x++, x2 += 2) {
 #if defined(_MZ1500)
 			dest0[x2] = dest0[x2 + 1] = palette_pc[palette[src[x] & 7]];
 #else
-			dest0[x2] = dest0[x2 + 1] = palette_pc[src[x] & 7];
+			if (config.dipswitch & (1 << 17)) {
+				dest0[x2] = dest0[x2 + 1] = (palette_pc[src[x] & 7] & RGB_COLOR(0x7F, 0x7F, 0x7F)) + (palette_pc[old[x] & 7] & RGB_COLOR(0x7F, 0x7F, 0x7F));
+			}
+			else {
+				dest0[x2] = dest0[x2 + 1] = (palette_pc[src[x] & 7]);
+			}
 #endif
 		}
 		if(!config.scan_line) {
 			my_memcpy(dest1, dest0, 640 * sizeof(scrntype_t));
 		} else {
 			memset(dest1, 0, 640 * sizeof(scrntype_t));
+		}
+		if (config.dipswitch & (1 << 17)) {
+			my_memcpy(old, src, 320 * sizeof(uint8_t));
 		}
 	}
 	emu->screen_skip_line(true);
@@ -1267,7 +1342,12 @@ bool MEMORY::process_state(FILEIO* state_fio, bool loading)
 	state_fio->StateArray(palette_mz800_pc, sizeof(palette_mz800_pc), 1);
 #endif
 	state_fio->StateArray(palette_pc, sizeof(palette_pc), 1);
-	
+
+#if defined(USE_ROMDISK)
+	state_fio->StateValue(ipl_page);
+	state_fio->StateValue(ipl_storage);
+#endif
+
 	// post process
 	if(loading) {
 		update_map_low();

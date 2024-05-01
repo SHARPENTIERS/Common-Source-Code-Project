@@ -692,12 +692,15 @@
 #define ID_RECENT_HD8                   45146 // 45146-45153
 #define ID_HD8_MENU_END                 45153
 
+#define ID_HOST_REC_MOVIE_50FPS         45503
+#define ID_HOST_REC_MOVIE_25FPS         45504
+
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        215
-#define _APS_NEXT_COMMAND_VALUE         45154
+#define _APS_NEXT_COMMAND_VALUE         45505
 #define _APS_NEXT_CONTROL_VALUE         1003
 #define _APS_NEXT_SYMED_VALUE           108
 #endif

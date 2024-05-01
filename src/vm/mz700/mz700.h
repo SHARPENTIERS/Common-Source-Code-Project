@@ -54,10 +54,13 @@
 // device informations for win32
 #if defined(_MZ700)
 #define USE_DIPSWITCH
+#define USE_COLOR_BLENDER
+#define USE_ROMDISK
 #elif defined(_MZ800)
 #define USE_BOOT_MODE		2
 #endif
 #define USE_TAPE		1
+#define USE_ROMDISK
 #define USE_FLOPPY_DISK		2
 #define USE_QUICK_DISK		1
 #define USE_AUTO_KEY		5
@@ -209,6 +212,9 @@ class KEYBOARD;
 class MEMORY;
 class QUICKDISK;
 class RAMFILE;
+#if defined(USE_ROMDISK)
+class SST39SF040;
+#endif
 
 #if defined(_MZ800) || defined(_MZ1500)
 class NOT;
@@ -248,7 +254,10 @@ protected:
 	MEMORY* memory;
 	RAMFILE* ramfile;
 	QUICKDISK* qd;
-	
+#if defined(USE_ROMDISK)
+	SST39SF040* sst39sf040;
+#endif
+
 #if defined(_MZ800) || defined(_MZ1500)
 	AND* and_snd;
 #if defined(_MZ800)

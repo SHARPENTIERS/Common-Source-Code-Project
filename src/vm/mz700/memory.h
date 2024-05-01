@@ -30,7 +30,10 @@ private:
 #if defined(_MZ700) || defined(_MZ1500)
 	DEVICE *d_joystick;
 #endif
-	
+#if defined(USE_ROMDISK)
+	DEVICE* d_romdisk[1];
+#endif
+
 	// memory
 	uint8_t* rbank[32];
 	uint8_t* wbank[32];
@@ -43,7 +46,7 @@ private:
 #else
 	uint8_t ext[0x1800];	// MZ-700/1500 EXT 6KB
 #endif
-	uint8_t font[0x1000];	// CGROM 4KB
+	uint8_t font[0x2000];	// CGROM 4KB / XCGROM 8KB
 #if defined(_MZ700)
 	uint8_t pcg[0x1000];	// PCG-700 2KB + Lower CGROM 2KB
 #elif defined(_MZ1500)
@@ -68,7 +71,11 @@ private:
 #elif defined(_MZ1500)
 	uint8_t pcg_bank;
 #endif
-	
+#if defined(USE_ROMDISK)
+	int8_t ipl_storage;		// 0: Normal IPL 4KB, 1: FLASH IPL+DISK 512KB
+	int8_t ipl_page;
+#endif
+
 	void update_map_low();
 	void update_map_middle();
 	void update_map_high();
@@ -106,6 +113,7 @@ private:
 	scrntype_t palette_mz800_pc[16];
 #else
 	uint8_t screen[200][320];
+	uint8_t screen_copy[200][320];
 #endif
 	scrntype_t palette_pc[8];
 	
@@ -128,7 +136,7 @@ public:
 	// common functions
 	void initialize();
 	void reset();
-#if defined(_MZ800)
+#if defined(_MZ800) || defined(USE_ROMDISK)
 	void update_config();
 #endif
 	void event_vline(int v, int clock);
@@ -138,7 +146,7 @@ public:
 	void write_data8w(uint32_t addr, uint32_t data, int* wait);
 	uint32_t read_data8w(uint32_t addr, int* wait);
 	void write_io8(uint32_t addr, uint32_t data);
-#if defined(_MZ800)
+#if defined(_MZ800) || defined(USE_ROMDISK)
 	uint32_t read_io8(uint32_t addr);
 #endif
 	bool process_state(FILEIO* state_fio, bool loading);
@@ -166,6 +174,14 @@ public:
 	void set_context_joystick(DEVICE* device)
 	{
 		d_joystick = device;
+	}
+#endif
+#if defined(USE_ROMDISK)
+	void set_context_romdisk(int i, DEVICE* device)
+	{
+		if (unsigned(i) < 2) {
+			d_romdisk[i] = device;
+		}
 	}
 #endif
 	void draw_screen();

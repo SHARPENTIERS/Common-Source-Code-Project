@@ -892,9 +892,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 			config.serial_type = LOWORD(wParam) - ID_VM_SERIAL_TYPE0;
 			break;
 #endif
-		case ID_HOST_REC_MOVIE_60FPS: case ID_HOST_REC_MOVIE_30FPS: case ID_HOST_REC_MOVIE_15FPS:
+		case ID_HOST_REC_MOVIE_60FPS: case ID_HOST_REC_MOVIE_50FPS: case ID_HOST_REC_MOVIE_30FPS: case ID_HOST_REC_MOVIE_25FPS: case ID_HOST_REC_MOVIE_15FPS:
 			if(emu) {
-				static const int fps[3] = {60, 30, 15};
+				static const int fps[5] = {60, 50, 30, 25, 15};
 				emu->start_record_sound();
 				if(!emu->start_record_video(fps[LOWORD(wParam) - ID_HOST_REC_MOVIE_60FPS])) {
 					emu->stop_record_sound();
@@ -1973,7 +1973,9 @@ void update_host_menu(HMENU hMenu)
 		now_stop = !now_rec;
 	}
 	EnableMenuItem(hMenu, ID_HOST_REC_MOVIE_60FPS, now_rec ? MF_GRAYED : MF_ENABLED);
+	EnableMenuItem(hMenu, ID_HOST_REC_MOVIE_50FPS, now_rec ? MF_GRAYED : MF_ENABLED);
 	EnableMenuItem(hMenu, ID_HOST_REC_MOVIE_30FPS, now_rec ? MF_GRAYED : MF_ENABLED);
+	EnableMenuItem(hMenu, ID_HOST_REC_MOVIE_25FPS, now_rec ? MF_GRAYED : MF_ENABLED);
 	EnableMenuItem(hMenu, ID_HOST_REC_MOVIE_15FPS, now_rec ? MF_GRAYED : MF_ENABLED);
 	EnableMenuItem(hMenu, ID_HOST_REC_SOUND, now_rec ? MF_GRAYED : MF_ENABLED);
 	EnableMenuItem(hMenu, ID_HOST_REC_STOP, now_stop ? MF_GRAYED : MF_ENABLED);
